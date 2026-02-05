@@ -1,6 +1,7 @@
 import os
 import logging
 import re
+import asyncio
 from telegram import (
     Update,
     InlineKeyboardButton,
@@ -21,7 +22,7 @@ from telegram.ext import (
 # Получаем токен
 TOKEN = os.getenv("TOKEN")
 
-# Состояния диалога (Оставляем вашу структуру)
+# Состояния диалога
 (
     ВЫБОР_ЯЗЫКА,
     ВЫБОР_ТИПА_СКИДКИ,
@@ -61,167 +62,181 @@ logging.basicConfig(
 )
 logger = logging.getLogger(__name__)
 
-# --- ЛОКАЛИЗАЦИЯ ---
-# Мы добавили ключи 'buttons' для нижнего меню
+# Словари с локализацией
 LOCALIZATION = {
     'ru': {
-        'buttons': {
-            'shelf': "📦 Скидка %",
-            'nx': "🎯 Акция N+X",
-            'kg': "⚖️ Цена за кг/л",
-            'orig': "🔙 Найти исх. цену",
-            'pro': "🌟 PRO режим",
-            'settings': "⚙️ Настройки",
-            'restart': "🔁 Перезапуск"
-        },
-        'welcome': "👋 Добро пожаловать! Выберите раздел в меню снизу:",
-        'main_menu': "👇 **Главное меню**\nВыберите нужный режим на клавиатуре снизу:",
-        'select_discount': "📦 **Режим: Скидка**\nВыберите процент кнопками или введите свой:",
+        'welcome': "👋 Добро пожаловать! Выберите язык:",
+        'main_menu': "👋 Добро пожаловать! Выберите опцию для расчета:",
+        'select_discount': "📦 Выберите процент скидки:",
         'enter_custom_discount': "🎯 Введите свой процент скидки (например, 14.44):",
         'enter_price': "🔢 Введите цену на полке (например, 545.44):",
         'price_result': "{title}\n\n💰 Цена на полке: {price:.2f} грн\n🎯 Скидка: {discount}%{extra}\n✅ Цена со скидкой: {discounted_price:.2f} грн",
         'invalid_discount': "❌ Ошибка. Скидка должна быть от 0% до 100%.",
-        'invalid_price': "❌ Ошибка. Введите цену корректно (число).",
-        'enter_n': "🔢 **Режим N+X**\nСколько товаров берем (N)? (Ведите число)",
-        'enter_x': "🎯 Сколько из них бесплатно (X)?",
-        'enter_nx_price': "💰 Введите цену одного товара:",
-        'nx_result': "{title}\n\n🛒 Акция: {n}+{x}\n💰 Цена одного: {price:.2f} грн\n💸 Всего за {n} шт: {total:.2f} грн\n🎯 Реальная скидка: {discount:.2f}%\n✅ **1 шт выходит: {unit_price:.2f} грн**",
-        'enter_weight_price': "💰 **Режим: Вес**\nВведите цену товара:",
-        'enter_weight': "⚖️ Введите вес (грамм/мл):",
+        'invalid_price': "❌ Ошибка. Введите цену корректно, например: 545.44.",
+        'enter_n': "🔢 Введите количество товаров, которые нужно купить (N):\n\nМожете выбрать цифру кнопками ниже.",
+        'enter_x': "🎯 Введите количество бесплатных товаров (X):\n\nМожете выбрать цифру кнопками ниже.",
+        'enter_nx_price': "💰 Введите цену одного товара (например, 99.99):",
+        'nx_result': "{title}\n\n🛒 Акция: {n}+{x}\n💰 Цена одного товара: {price:.2f} грн\n💸 Общая сумма: {total:.2f} грн\n🎯 Фактичная скидка: {discount:.2f}%\n✅ Цена за единицу с учетом акции: {unit_price:.2f} грн",
+        'enter_weight_price': "💰 Введите цену товара (например, 50.75):",
+        'enter_weight': "⚖️ Введите количество грамм/мл в упаковке (например, 125):",
         'weight_result': '{title}\n\n💰 Цена: {price:.2f} грн\n⚖️ Вес: {weight:.2f} г/мл\n📊 Цена за 1 кг/л: {kg_price:.2f} грн\n📏 Цена за 100 г/мл: {price_100g:.2f} грн',
-        'invalid_number': 'Пожалуйста, введите корректное число.',
-        'error': '❌ Ошибка.',
-        'cancel': "❌ Отмена.",
-        'unexpected_text': "👇 Пожалуйста, выберите режим в меню снизу.",
-        'settings_menu': "⚙️ Настройки:",
+        'enter_price_short': 'Введите цену товара:',
+        'enter_weight_short': 'Введите вес/объем (в граммах или мл):',
+        'invalid_number': 'Пожалуйста, введите корректное число (больше 0).',
+        'error': '❌ Произошла ошибка. Попробуйте снова или введите /start для перезапуска.',
+        'cancel': "❌ Операция отменена. Введите /start для начала работы.",
+        'restart': "🔄 Бот перезапущен!\n👋 Добро пожаловать! Выберите опцию для расчета:",
+        'unexpected_text': "❌ Пожалуйста, используйте кнопки меню для выбора. Если вы хотите ввести свое значение, сначала выберите 'Другая %'.",
+        'settings_menu': "⚙️ Настройки\nВыберите опцию:",
         'change_language': "🔄 Сменить язык",
-        'back': "🔙 Назад в меню",
-        'next_action_prompt': "👇 Выберите следующее действие в меню:",
-        'calc_title_shelf': "📦 Расчет скидки",
-        'calc_title_nx': "🎯 Расчет N+X",
-        'calc_title_per_kg': "⚖️ Расчет веса",
-        'calc_title_original_price': "💼 Поиск цены без скидки",
-        # Для PRO режима оставляем тексты как есть
-        'mode_pro_auto': "🌟 PRO: Авто-режим",
-        'mode_pro_fixed': "🌟 PRO: Фикс. скидка",
-        'mode_pro_loyal': "🌟 PRO: Карта лояльности",
-        'mode_pro_double': "🌟 PRO: Двойная скидка",
-        'mode_pro_compare': "🌟 PRO: Сравнение товаров",
-        'mode_pro_promo': "🌟 PRO: Сравнение промо",
-        'mode_pro_margin': "🌟 PRO: Маржа",
-        'mode_pro_history': "🌟 PRO: История",
-        'pro_menu_title': "🌟 PRO режим. Выберите функцию:",
-        'pro_btn_auto': "🤖 Авто",
-        'pro_btn_fixed': "💸 Фикс",
-        'pro_btn_loyal': "💳 Карта",
-        'pro_btn_double': "🔁 Двойная",
-        'pro_btn_compare': "⚖️ Сравнить",
-        'pro_btn_promo': "📉 Промо",
-        'pro_btn_margin': "📊 Маржа",
-        'pro_btn_history': "📜 История",
-        'pro_enter_expression': "✍️ Введите выражение (299-40% или 2+1 цена 60):",
-        'pro_fixed_enter_price': "💰 Введите цену:",
-        'pro_fixed_enter_discount_sum': "💸 Введите сумму скидки:",
-        'pro_loyal_enter_regular': "💰 Цена без карты:",
-        'pro_loyal_enter_card': "💳 Цена по карте:",
-        'pro_double_enter_price': "💰 Цена товара:",
-        'pro_double_enter_first': "🔁 Первая скидка (%):",
-        'pro_double_enter_second': "🔁 Вторая скидка (%):",
-        'pro_compare_first_price': "1️⃣ Цена товара 1:",
-        'pro_compare_first_weight': "1️⃣ Вес товара 1:",
-        'pro_compare_second_price': "2️⃣ Цена товара 2:",
-        'pro_compare_second_weight': "2️⃣ Вес товара 2:",
-        'pro_promo_old_price': "💵 Старая цена:",
-        'pro_promo_new_price': "💸 Новая цена:",
-        'pro_margin_cost': "💼 Закупка:",
-        'pro_margin_shelf': "🏷️ Полка:",
-        'pro_history_empty': "История пуста.",
-        'pro_history_title': "📜 История:",
-        'pro_auto_unknown': "⚠️ Не понял формат.",
+        'back': "🔙 Назад",
+        'next_action_prompt': "📊 Выберите следующее действие:",
+        'restart_btn': "🔁 Перезапустить бот",
+        'mode_shelf': "📦 Вы выбрали: «Сколько стоит со скидкой»",
+        'mode_nx': "🎯 Вы выбрали: «Скидка по акции N+X»",
+        'mode_per_kg': "⚖️ Вы выбрали: «Сколько за кг/литр»",
+        'mode_original_price': "💼 Вы выбрали: «Узнать регулярную цену без скидки»",
+        'calc_title_shelf': "📦 Сколько стоит со скидкой",
+        'calc_title_nx': "🎯 Скидка по акции N+X",
+        'calc_title_per_kg': "⚖️ Сколько за кг/литр",
+        'calc_title_original_price': "💼 Узнать регулярную цену без скидки",
+        'main_menu_btn': [
+            ("📦 Сколько стоит со скидкой", "menu_shelf_discount"),
+            ("🎯 Скидка по акции N+X", "menu_nx"),
+            ("⚖️ Сколько за кг/литр", "menu_per_kg"),
+            ("💼 Узнать регулярную цену без скидки", "menu_original_price"),
+            ("🌟 PRO режим", "menu_pro"),
+            ("⚙️ Настройки", "настройки"),
+        ],
         'discount_buttons': [
             [("5%", "5"), ("10%", "10"), ("15%", "15"), ("20%", "20")],
             [("25%", "25"), ("30%", "30"), ("35%", "35"), ("40%", "40")],
             [("45%", "45"), ("50%", "50"), ("Другая %", "другая_скидка")]
         ],
+        'mode_pro_auto': "🌟 PRO: Авто-режим",
+        'mode_pro_fixed': "🌟 PRO: Фиксированная скидка (грн)",
+        'mode_pro_loyal': "🌟 PRO: Цена по карте лояльности",
+        'mode_pro_double': "🌟 PRO: Двойная скидка",
+        'mode_pro_compare': "🌟 PRO: Сравнение 2 товаров",
+        'mode_pro_promo': "🌟 PRO: Сравнение промо и обычной цены",
+        'mode_pro_margin': "🌟 PRO: Маржа и наценка",
+        'mode_pro_history': "🌟 PRO: История расчетов",
+        'pro_menu_title': "🌟 PRO режим. Выберите функцию:",
+        'pro_btn_auto': "🤖 Авто-режим",
+        'pro_btn_fixed': "💸 Фиксированная скидка (грн)",
+        'pro_btn_loyal': "💳 Цена по карте лояльности",
+        'pro_btn_double': "🔁 Двойная скидка",
+        'pro_btn_compare': "⚖️ Сравнить 2 товара",
+        'pro_btn_promo': "📉 Сравнить промо и обычную цену",
+        'pro_btn_margin': "📊 Маржа и наценка",
+        'pro_btn_history': "📜 История расчётов",
+        'pro_enter_expression': "✍️ Отправьте выражение одним сообщением.\nПримеры:\n• 299 - 40%\n• 2+1 цена 60\n• 350 г за 42",
+        'pro_fixed_enter_price': "💰 Введите цену товара:",
+        'pro_fixed_enter_discount_sum': "💸 Введите размер скидки в гривнах:",
+        'pro_loyal_enter_regular': "💰 Введите обычную цену (без карты):",
+        'pro_loyal_enter_card': "💳 Введите цену по карте лояльности:",
+        'pro_double_enter_price': "💰 Введите цену товара:",
+        'pro_double_enter_first': "🔁 Введите первую скидку в процентах:",
+        'pro_double_enter_second': "🔁 Введите вторую скидку в процентах:",
+        'pro_compare_first_price': "1️⃣ Введите цену первого товара:",
+        'pro_compare_first_weight': "1️⃣ Введите вес/объем первого товара (в граммах или мл):",
+        'pro_compare_second_price': "2️⃣ Введите цену второго товара:",
+        'pro_compare_second_weight': "2️⃣ Введите вес/объем второго товара (в граммах или мл):",
+        'pro_promo_old_price': "💵 Введите обычную цену (до скидки):",
+        'pro_promo_new_price': "💸 Введите акционную цену (со скидкой):",
+        'pro_margin_cost': "💼 Введите закупочную цену товара:",
+        'pro_margin_shelf': "🏷️ Введите цену товара на полке:",
+        'pro_history_empty': "Пока нет сохранённых расчётов.",
+        'pro_history_title': "📜 История последних расчётов:",
+        'pro_invalid_number': "❌ Некорректное значение. Введите число, например 123.45",
+        'pro_auto_unknown': "⚠️ Не удалось распознать выражение.\nПопробуйте другой формат или используйте стандартные режимы.",
     },
     'uk': {
-        'buttons': {
-            'shelf': "📦 Знижка %",
-            'nx': "🎯 Акція N+X",
-            'kg': "⚖️ Ціна за кг/л",
-            'orig': "🔙 Знайти вих. ціну",
-            'pro': "🌟 PRO режим",
-            'settings': "⚙️ Налаштування",
-            'restart': "🔁 Перезапуск"
-        },
-        'welcome': "👋 Ласкаво просимо! Оберіть розділ в меню знизу:",
-        'main_menu': "👇 **Головне меню**\nОберіть потрібний режим на клавіатурі знизу:",
-        'select_discount': "📦 **Режим: Знижка**\nОберіть відсоток кнопками або введіть свій:",
+        'welcome': "👋 Ласкаво просимо! Оберіть мову:",
+        'main_menu': "👋 Ласкаво просимо! Оберіть опцію для розрахунку:",
+        'select_discount': "📦 Оберіть відсоток знижки:",
         'enter_custom_discount': "🎯 Введіть свій відсоток знижки (наприклад, 14.44):",
         'enter_price': "🔢 Введіть ціну на полиці (наприклад, 545.44):",
         'price_result': "{title}\n\n💰 Ціна на полиці: {price:.2f} грн\n🎯 Знижка: {discount}%{extra}\n✅ Ціна зі знижкою: {discounted_price:.2f} грн",
         'invalid_discount': "❌ Помилка. Знижка має бути від 0% до 100%.",
-        'invalid_price': "❌ Помилка. Введіть ціну коректно (число).",
-        'enter_n': "🔢 **Режим N+X**\nСкільки товарів беремо (N)? (Введіть число)",
-        'enter_x': "🎯 Скільки з них безкоштовно (X)?",
-        'enter_nx_price': "💰 Введіть ціну одного товару:",
-        'nx_result': "{title}\n\n🛒 Акція: {n}+{x}\n💰 Ціна одного: {price:.2f} грн\n💸 Всього за {n} шт: {total:.2f} грн\n🎯 Реальна знижка: {discount:.2f}%\n✅ **1 шт виходить: {unit_price:.2f} грн**",
-        'enter_weight_price': "💰 **Режим: Вага**\nВведіть ціну товару:",
-        'enter_weight': "⚖️ Введіть вагу (грам/мл):",
+        'invalid_price': "❌ Помилка. Введіть ціну коректно, наприклад: 545.44.",
+        'enter_n': "🔢 Введіть кількість товарів, які потрібно купити (N):\n\nМожете обрати цифру кнопками нижче.",
+        'enter_x': "🎯 Введіть кількість безкоштовних товарів (X):\n\nМожете обрати цифру кнопками нижче.",
+        'enter_nx_price': "💰 Введіть ціну одного товару (наприклад, 99.99):",
+        'nx_result': "{title}\n\n🛒 Акція: {n}+{x}\n💰 Ціна одного товару: {price:.2f} грн\n💸 Загальна сума: {total:.2f} грн\n🎯 Фактична знижка: {discount:.2f}%\n✅ Ціна за одиницю з урахуванням акції: {unit_price:.2f} грн",
+        'enter_weight_price': "💰 Введіть ціну товару (наприклад, 50.75):",
+        'enter_weight': "⚖️ Введіть кількість грамів/мл в упаковці (наприклад, 125):",
         'weight_result': '{title}\n\n💰 Ціна: {price:.2f} грн\n⚖️ Вага: {weight:.2f} г/мл\n📊 Ціна за 1 кг/л: {kg_price:.2f} грн\n📏 Ціна за 100 г/мл: {price_100g:.2f} грн',
-        'invalid_number': 'Будь ласка, введіть коректне число.',
-        'error': '❌ Помилка.',
-        'cancel': "❌ Скасування.",
-        'unexpected_text': "👇 Будь ласка, оберіть режим в меню знизу.",
-        'settings_menu': "⚙️ Налаштування:",
+        'enter_price_short': 'Введіть ціну товару:',
+        'enter_weight_short': 'Введіть вагу/об’єм (у грамах або мл):',
+        'invalid_number': 'Будь ласка, введіть коректне число (більше 0).',
+        'error': '❌ Сталася помилка. Спробуйте ще раз або введіть /start для перезапуску.',
+        'cancel': "❌ Операцію скасовано. Введіть /start для початку роботи.",
+        'restart': "🔄 Бот перезапущено!\n👋 Ласкаво просимо! Оберіть опцію для розрахунку:",
+        'unexpected_text': "❌ Будь ласка, використовуйте кнопки меню для вибору. Якщо хочете ввести власне значення, спочатку оберіть 'Інший %'.",
+        'settings_menu': "⚙️ Налаштування\nОберіть опцію:",
         'change_language': "🔄 Змінити мову",
-        'back': "🔙 Назад в меню",
-        'next_action_prompt': "👇 Оберіть наступну дію в меню:",
-        'calc_title_shelf': "📦 Розрахунок знижки",
-        'calc_title_nx': "🎯 Розрахунок N+X",
-        'calc_title_per_kg': "⚖️ Розрахунок ваги",
-        'calc_title_original_price': "💼 Пошук ціни без знижки",
-        'mode_pro_auto': "🌟 PRO: Авто-режим",
-        'mode_pro_fixed': "🌟 PRO: Фікс. знижка",
-        'mode_pro_loyal': "🌟 PRO: Картка лояльності",
-        'mode_pro_double': "🌟 PRO: Подвійна знижка",
-        'mode_pro_compare': "🌟 PRO: Порівняння товарів",
-        'mode_pro_promo': "🌟 PRO: Порівняння промо",
-        'mode_pro_margin': "🌟 PRO: Маржа",
-        'mode_pro_history': "🌟 PRO: Історія",
-        'pro_menu_title': "🌟 PRO режим. Оберіть функцію:",
-        'pro_btn_auto': "🤖 Авто",
-        'pro_btn_fixed': "💸 Фікс",
-        'pro_btn_loyal': "💳 Картка",
-        'pro_btn_double': "🔁 Подвійна",
-        'pro_btn_compare': "⚖️ Порівняти",
-        'pro_btn_promo': "📉 Промо",
-        'pro_btn_margin': "📊 Маржа",
-        'pro_btn_history': "📜 Історія",
-        'pro_enter_expression': "✍️ Введіть вираз (299-40% або 2+1 ціна 60):",
-        'pro_fixed_enter_price': "💰 Введіть ціну:",
-        'pro_fixed_enter_discount_sum': "💸 Введіть суму знижки:",
-        'pro_loyal_enter_regular': "💰 Ціна без картки:",
-        'pro_loyal_enter_card': "💳 Ціна з карткою:",
-        'pro_double_enter_price': "💰 Ціна товару:",
-        'pro_double_enter_first': "🔁 Перша знижка (%):",
-        'pro_double_enter_second': "🔁 Друга знижка (%):",
-        'pro_compare_first_price': "1️⃣ Ціна товару 1:",
-        'pro_compare_first_weight': "1️⃣ Вага товару 1:",
-        'pro_compare_second_price': "2️⃣ Ціна товару 2:",
-        'pro_compare_second_weight': "2️⃣ Вага товару 2:",
-        'pro_promo_old_price': "💵 Стара ціна:",
-        'pro_promo_new_price': "💸 Нова ціна:",
-        'pro_margin_cost': "💼 Закупівля:",
-        'pro_margin_shelf': "🏷️ Полиця:",
-        'pro_history_empty': "Історія порожня.",
-        'pro_history_title': "📜 Історія:",
-        'pro_auto_unknown': "⚠️ Не зрозумів формат.",
+        'back': "🔙 Назад",
+        'next_action_prompt': "📊 Оберіть наступну дію:",
+        'restart_btn': "🔁 Перезапустити бота",
+        'mode_shelf': "📦 Ви обрали: «Скільки коштує зі знижкою»",
+        'mode_nx': "🎯 Ви обрали: «Знижка по акції N+X»",
+        'mode_per_kg': "⚖️ Ви обрали: «Скільки за кг/літр»",
+        'mode_original_price': "💼 Ви обрали: «Дізнатись регулярну ціну без знижки»",
+        'calc_title_shelf': "📦 Скільки коштує зі знижкою",
+        'calc_title_nx': "🎯 Знижка по акції N+X",
+        'calc_title_per_kg': "⚖️ Скільки за кг/літр",
+        'calc_title_original_price': "💼 Дізнатись регулярну ціну без знижки",
+        'main_menu_btn': [
+            ("📦 Скільки коштує зі знижкою", "menu_shelf_discount"),
+            ("🎯 Знижка по акції N+X", "menu_nx"),
+            ("⚖️ Скільки за кг/літр", "menu_per_kg"),
+            ("💼 Дізнатись регулярну ціну без знижки", "menu_original_price"),
+            ("🌟 PRO режим", "menu_pro"),
+            ("⚙️ Налаштування", "настройки"),
+        ],
         'discount_buttons': [
             [("5%", "5"), ("10%", "10"), ("15%", "15"), ("20%", "20")],
             [("25%", "25"), ("30%", "30"), ("35%", "35"), ("40%", "40")],
             [("45%", "45"), ("50%", "50"), ("Інший %", "інша_знижка")]
         ],
+        'mode_pro_auto': "🌟 PRO: Авто-режим",
+        'mode_pro_fixed': "🌟 PRO: Фіксована знижка (грн)",
+        'mode_pro_loyal': "🌟 PRO: Ціна за карткою лояльності",
+        'mode_pro_double': "🌟 PRO: Подвійна знижка",
+        'mode_pro_compare': "🌟 PRO: Порівняння 2 товарів",
+        'mode_pro_promo': "🌟 PRO: Порівняння промо та звичайної ціни",
+        'mode_pro_margin': "🌟 PRO: Маржа та націнка",
+        'mode_pro_history': "🌟 PRO: Історія розрахунків",
+        'pro_menu_title': "🌟 PRO режим. Оберіть функцію:",
+        'pro_btn_auto': "🤖 Авто-режим",
+        'pro_btn_fixed': "💸 Фіксована знижка (грн)",
+        'pro_btn_loyal': "💳 Ціна за карткою лояльності",
+        'pro_btn_double': "🔁 Подвійна знижка",
+        'pro_btn_compare': "⚖️ Порівняти 2 товари",
+        'pro_btn_promo': "📉 Порівняти промо та звичайну ціну",
+        'pro_btn_margin': "📊 Маржа та націнка",
+        'pro_btn_history': "📜 Історія розрахунків",
+        'pro_enter_expression': "✍️ Надішліть вираз одним повідомленням.\nПриклади:\n• 299 - 40%\n• 2+1 ціна 60\n• 350 г за 42",
+        'pro_fixed_enter_price': "💰 Введіть ціну товару:",
+        'pro_fixed_enter_discount_sum': "💸 Введіть розмір знижки в гривнях:",
+        'pro_loyal_enter_regular': "💰 Введіть звичайну ціну (без картки):",
+        'pro_loyal_enter_card': "💳 Введіть ціну за карткою лояльності:",
+        'pro_double_enter_price': "💰 Введіть ціну товару:",
+        'pro_double_enter_first': "🔁 Введіть першу знижку у відсотках:",
+        'pro_double_enter_second': "🔁 Введіть другу знижку у відсотках:",
+        'pro_compare_first_price': "1️⃣ Введіть ціну першого товару:",
+        'pro_compare_first_weight': "1️⃣ Введіть вагу/об’єм першого товару (у грамах або мл):",
+        'pro_compare_second_price': "2️⃣ Введіть ціну другого товару:",
+        'pro_compare_second_weight': "2️⃣ Введіть вагу/об’єм другого товару (у грамах або мл):",
+        'pro_promo_old_price': "💵 Введіть звичайну ціну (до знижки):",
+        'pro_promo_new_price': "💸 Введіть акційну ціну (зі знижкою):",
+        'pro_margin_cost': "💼 Введіть закупівельну ціну товару:",
+        'pro_margin_shelf': "🏷️ Введіть ціну товару на полиці:",
+        'pro_history_empty': "Поки що немає збережених розрахунків.",
+        'pro_history_title': "📜 Історія останніх розрахунків:",
+        'pro_invalid_number': "❌ Некоректне значення. Введіть число, наприклад 123.45",
+        'pro_auto_unknown': "⚠️ Не вдалося розпізнати вираз.\nСпробуйте інший формат або використайте стандартні режими.",
     }
 }
 
@@ -235,12 +250,14 @@ def get_language(context: ContextTypes.DEFAULT_TYPE | None) -> str:
         pass
     return 'ru'
 
+
 def add_to_history(context: ContextTypes.DEFAULT_TYPE, entry: str) -> None:
     history = context.user_data.get("history", [])
     history.append(entry)
     if len(history) > 10:
         history = history[-10:]
     context.user_data["history"] = history
+
 
 async def send_clean_message(
     update: Update,
@@ -249,81 +266,128 @@ async def send_clean_message(
     reply_markup=None,
     keep_result: bool = False,
 ):
-    """
-    Отправляет сообщение, пытаясь подчистить старые (кроме клавиатуры).
-    В версии с ReplyKeyboard мы не можем удалять сообщение пользователя с кнопкой,
-    иначе он подумает, что бот глючит.
-    """
     bot = context.bot
-    chat_id = update.effective_chat.id
+    if update.callback_query:
+        chat = update.callback_query.message.chat
+        trigger_message_id = update.callback_query.message.message_id
+    else:
+        chat = update.message.chat
+        trigger_message_id = update.message.message_id
 
-    # Удаляем старые сообщения бота, если они записаны
     old_ids = context.user_data.get("messages_to_delete", [])
     for mid in old_ids:
         try:
-            await bot.delete_message(chat_id=chat_id, message_id=mid)
+            await bot.delete_message(chat_id=chat.id, message_id=mid)
         except Exception:
             pass
     context.user_data["messages_to_delete"] = []
 
-    # Отправляем новое сообщение
-    sent = await bot.send_message(chat_id=chat_id, text=text, reply_markup=reply_markup)
+    try:
+        await bot.delete_message(chat.id, trigger_message_id)
+    except Exception:
+        pass
 
-    # Записываем ID нового сообщения, чтобы удалить его потом
+    sent = await bot.send_message(chat_id=chat.id, text=text, reply_markup=reply_markup)
+
+    all_bot = context.user_data.get("all_bot_messages", [])
+    all_bot.append(sent.message_id)
+    context.user_data["all_bot_messages"] = all_bot
+
     if not keep_result:
         context.user_data["messages_to_delete"].append(sent.message_id)
 
     return sent
 
+
+async def delete_mode_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    mode_id = context.user_data.pop('mode_message_id', None)
+    if not mode_id:
+        return
+    chat = update.effective_chat
+    if not chat:
+        return
+    try:
+        await context.bot.delete_message(chat_id=chat.id, message_id=mode_id)
+    except Exception:
+        pass
+
+
 def get_language_keyboard():
-    # Для выбора языка используем Inline
     keyboard = [
         [InlineKeyboardButton("Русский", callback_data="lang_ru")],
         [InlineKeyboardButton("Українська", callback_data="lang_uk")]
     ]
     return InlineKeyboardMarkup(keyboard)
 
+
 def get_main_menu_keyboard(context: ContextTypes.DEFAULT_TYPE):
-    """
-    Главное изменение: ReplyKeyboardMarkup (кнопки внизу).
-    """
     lang = get_language(context)
-    b = LOCALIZATION[lang]['buttons']
     keyboard = [
-        [b['shelf'], b['nx']],
-        [b['kg'], b['orig']],
-        [b['pro'], b['settings']]
+        [InlineKeyboardButton(text, callback_data=data)]
+        for text, data in LOCALIZATION[lang]['main_menu_btn']
     ]
-    return ReplyKeyboardMarkup(keyboard, resize_keyboard=True)
+    return InlineKeyboardMarkup(keyboard)
+
+
+def get_next_actions_keyboard(context: ContextTypes.DEFAULT_TYPE):
+    lang = get_language(context)
+    keyboard = [
+        [InlineKeyboardButton(text, callback_data=data)]
+        for text, data in LOCALIZATION[lang]['main_menu_btn']
+    ]
+    keyboard.append([
+        InlineKeyboardButton(
+            LOCALIZATION[lang]['restart_btn'],
+            callback_data="перезапустить_бот"
+        )
+    ])
+    return InlineKeyboardMarkup(keyboard)
+
 
 def get_discount_keyboard(context: ContextTypes.DEFAULT_TYPE):
-    # Для выбора процентов оставляем Inline - это удобно
     lang = get_language(context)
     keyboard = [
         [InlineKeyboardButton(text, callback_data=data) for text, data in row]
         for row in LOCALIZATION[lang]['discount_buttons']
     ]
-    # Добавляем кнопку "Назад" (хотя можно и через меню снизу выйти)
-    # keyboard.append([InlineKeyboardButton(LOCALIZATION[lang]['back'], callback_data="назад")])
+    keyboard.append([InlineKeyboardButton(LOCALIZATION[lang]['back'], callback_data="назад")])
     return InlineKeyboardMarkup(keyboard)
+
 
 def get_settings_keyboard(context: ContextTypes.DEFAULT_TYPE):
     lang = get_language(context)
-    # Настройки - Inline
     keyboard = [
         [InlineKeyboardButton(LOCALIZATION[lang]['change_language'], callback_data="сменить_язык")],
+        [InlineKeyboardButton(LOCALIZATION[lang]['back'], callback_data="назад")],
+        [InlineKeyboardButton(LOCALIZATION[lang]['restart_btn'], callback_data="перезапустить_бот")],
     ]
     return InlineKeyboardMarkup(keyboard)
+
+
+def get_numeric_reply_keyboard():
+    keyboard = [
+        ["1", "2", "3"],
+        ["4", "5", "6"],
+        ["7", "8", "9"],
+        ["10"],
+    ]
+    return ReplyKeyboardMarkup(keyboard, resize_keyboard=True, one_time_keyboard=True)
+
 
 def get_pro_menu_keyboard(context: ContextTypes.DEFAULT_TYPE):
     lang = get_language(context)
     L = LOCALIZATION[lang]
-    # PRO меню - Inline, так как функций много
     keyboard = [
-        [InlineKeyboardButton(L['pro_btn_auto'], callback_data="pro_auto"), InlineKeyboardButton(L['pro_btn_fixed'], callback_data="pro_fixed")],
-        [InlineKeyboardButton(L['pro_btn_loyal'], callback_data="pro_loyal"), InlineKeyboardButton(L['pro_btn_double'], callback_data="pro_double")],
-        [InlineKeyboardButton(L['pro_btn_compare'], callback_data="pro_compare"), InlineKeyboardButton(L['pro_btn_promo'], callback_data="pro_promo")],
-        [InlineKeyboardButton(L['pro_btn_margin'], callback_data="pro_margin"), InlineKeyboardButton(L['pro_btn_history'], callback_data="pro_history")],
+        [InlineKeyboardButton(L['pro_btn_auto'], callback_data="pro_auto")],
+        [InlineKeyboardButton(L['pro_btn_fixed'], callback_data="pro_fixed")],
+        [InlineKeyboardButton(L['pro_btn_loyal'], callback_data="pro_loyal")],
+        [InlineKeyboardButton(L['pro_btn_double'], callback_data="pro_double")],
+        [InlineKeyboardButton(L['pro_btn_compare'], callback_data="pro_compare")],
+        [InlineKeyboardButton(L['pro_btn_promo'], callback_data="pro_promo")],
+        [InlineKeyboardButton(L['pro_btn_margin'], callback_data="pro_margin")],
+        [InlineKeyboardButton(L['pro_btn_history'], callback_data="pro_history")],
+        [InlineKeyboardButton(L['back'], callback_data="назад")],
+        [InlineKeyboardButton(LOCALIZATION[lang]['restart_btn'], callback_data="перезапустить_бот")],
     ]
     return InlineKeyboardMarkup(keyboard)
 
@@ -332,45 +396,52 @@ def get_pro_menu_keyboard(context: ContextTypes.DEFAULT_TYPE):
 async def start(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int:
     if 'language' not in context.user_data:
         context.user_data['попередній_стан'] = ВЫБОР_ЯЗЫКА
-        await update.message.reply_text(
+        await send_clean_message(
+            update,
+            context,
             "👋 Выберите язык / Оберіть мову:",
             reply_markup=get_language_keyboard()
         )
         return ВЫБОР_ЯЗЫКА
 
     lang = get_language(context)
-    # Отправляем главное меню (кнопки снизу)
-    await update.message.reply_text(
+    saved_lang = lang
+    context.user_data.clear()
+    context.user_data['language'] = saved_lang
+    context.user_data['попередній_стан'] = ВЫБОР_ТИПА_СКИДКИ
+    keyboard = get_main_menu_keyboard(context)
+
+    await send_clean_message(
+        update,
+        context,
         LOCALIZATION[lang]['main_menu'],
-        reply_markup=get_main_menu_keyboard(context),
-        parse_mode="Markdown"
+        reply_markup=keyboard
     )
     return ВЫБОР_ТИПА_СКИДКИ
 
-async def restart(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int:
-    context.user_data.clear()
-    context.user_data['language'] = 'ru'
-    await start(update, context)
-    return ВЫБОР_ЯЗЫКА
 
 async def choose_language(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int:
     query = update.callback_query
     await query.answer()
     lang = query.data.split('_')[1]
     context.user_data['language'] = lang
-    
-    # После выбора языка показываем главное меню снизу
-    await query.message.delete()
-    await query.message.reply_text(
+    context.user_data['попередній_стан'] = ВЫБОР_ТИПА_СКИДКИ
+    keyboard = get_main_menu_keyboard(context)
+
+    await send_clean_message(
+        update,
+        context,
         LOCALIZATION[lang]['main_menu'],
-        reply_markup=get_main_menu_keyboard(context),
-        parse_mode="Markdown"
+        reply_markup=keyboard
     )
     return ВЫБОР_ТИПА_СКИДКИ
 
+
 async def settings_menu(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int:
     lang = get_language(context)
-    # Настройки показываем сообщением с Inline кнопками
+    context.user_data['попередній_стан'] = ВЫБОР_ТИПА_СКИДКИ
+    await update.callback_query.answer()
+
     await send_clean_message(
         update,
         context,
@@ -379,8 +450,10 @@ async def settings_menu(update: Update, context: ContextTypes.DEFAULT_TYPE) -> i
     )
     return НАСТРОЙКИ
 
+
 async def change_language(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int:
     await update.callback_query.answer()
+    context.user_data['попередній_стан'] = НАСТРОЙКИ
     await send_clean_message(
         update,
         context,
@@ -389,40 +462,54 @@ async def change_language(update: Update, context: ContextTypes.DEFAULT_TYPE) ->
     )
     return ВЫБОР_ЯЗЫКА
 
-# --- ОСНОВНЫЕ ФУНКЦИИ (Обработчики нажатий на кнопки меню) ---
+# --- ОСНОВНЫЕ ФУНКЦИИ ---
 
 async def calculate_shelf_discount(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int:
     lang = get_language(context)
     context.user_data['текущее_действие'] = 'menu_shelf_discount'
-    
-    # Теперь мы здесь, потому что нажали кнопку ТЕКСТОМ, а не Callback
-    # Спрашиваем скидку (сразу показываем кнопки %)
+    context.user_data['попередній_стан'] = ВЫБОР_ТИПА_СКИДКИ
+    if update.callback_query:
+        await update.callback_query.answer()
+
+    mode_msg = await send_clean_message(
+        update,
+        context,
+        LOCALIZATION[lang]['mode_shelf'],
+        reply_markup=None,
+        keep_result=True,
+    )
+    context.user_data['mode_message_id'] = mode_msg.message_id
+
     await send_clean_message(
         update,
         context,
         LOCALIZATION[lang]['select_discount'],
         reply_markup=get_discount_keyboard(context)
     )
-    return ВЫБОР_ТИПА_СКИДКИ # Остаемся в этом состоянии, но уже ждем нажатия на %
+    return ВЫБОР_ТИПА_СКИДКИ
+
 
 async def handle_fixed_discount(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int:
-    # Обработка выбора процента (Inline кнопка)
     lang = get_language(context)
     await update.callback_query.answer()
     discount = float(update.callback_query.data)
     context.user_data['скидка'] = discount
-    
+    context.user_data['попередній_стан'] = ВЫБОР_ТИПА_СКИДКИ
+
     await send_clean_message(
         update,
         context,
         LOCALIZATION[lang]['enter_price'],
-        reply_markup=None # Убираем кнопки, ждем текст
+        reply_markup=None
     )
     return ОЖИДАНИЕ_ЦЕНЫ
 
+
 async def custom_discount(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int:
     lang = get_language(context)
+    context.user_data['попередній_стан'] = ВЫБОР_ТИПА_СКИДКИ
     await update.callback_query.answer()
+
     await send_clean_message(
         update,
         context,
@@ -431,318 +518,663 @@ async def custom_discount(update: Update, context: ContextTypes.DEFAULT_TYPE) ->
     )
     return ОЖИДАНИЕ_СВОЕЙ_СКИДКИ
 
-async def handle_discount_input(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int:
-    # Обработка ввода "своей" скидки руками
-    lang = get_language(context)
-    text = update.message.text.replace(',', '.')
-    
-    # Если юзер нажал кнопку меню, выходим
-    if text in LOCALIZATION[lang]['buttons'].values():
-        return await route_menu_button(update, context)
 
+async def handle_discount_input(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int:
+    lang = get_language(context)
     try:
+        text = update.message.text.replace(',', '.')
+        if not all(c.isdigit() or c == '.' for c in text):
+            await send_clean_message(update, context, LOCALIZATION[lang]['invalid_discount'])
+            return ОЖИДАНИЕ_СВОЕЙ_СКИДКИ
+
         discount = float(text)
-        if not (0 < discount < 100): raise ValueError()
+        if discount <= 0 or discount >= 100:
+            await send_clean_message(update, context, LOCALIZATION[lang]['invalid_discount'])
+            return ОЖИДАНИЕ_СВОЕЙ_СКИДКИ
+
         context.user_data['скидка'] = discount
-        await send_clean_message(update, context, LOCALIZATION[lang]['enter_price'])
+        context.user_data['попередній_стан'] = ОЖИДАНИЕ_СВОЕЙ_СКИДКИ
+
+        await send_clean_message(
+            update,
+            context,
+            LOCALIZATION[lang]['enter_price'],
+            reply_markup=None
+        )
         return ОЖИДАНИЕ_ЦЕНЫ
-    except:
+    except ValueError:
         await send_clean_message(update, context, LOCALIZATION[lang]['invalid_discount'])
         return ОЖИДАНИЕ_СВОЕЙ_СКИДКИ
+    except Exception as e:
+        logger.error(f"Error: {e}")
+        await send_clean_message(update, context, LOCALIZATION[lang]['error'])
+        return ОЖИДАНИЕ_СВОЕЙ_СКИДКИ
+
 
 async def handle_price_input(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int:
     lang = get_language(context)
-    text = update.message.text.replace(',', '.')
-
-    # Проверка на выход в меню
-    if text in LOCALIZATION[lang]['buttons'].values():
-        return await route_menu_button(update, context)
-
     try:
+        text = update.message.text.replace(',', '.')
+        if not all(c.isdigit() or c == '.' for c in text):
+            await send_clean_message(update, context, LOCALIZATION[lang]['invalid_price'])
+            return ОЖИДАНИЕ_ЦЕНЫ
+
         price = float(text)
+        if price <= 0:
+            await send_clean_message(update, context, LOCALIZATION[lang]['invalid_price'])
+            return ОЖИДАНИЕ_ЦЕНЫ
+
         discount = context.user_data.get('скидка', 0)
-        final = price * (1 - discount / 100)
-        
+        discounted_price = price * (1 - discount / 100)
+        extra = f" ({context.user_data.get('extra_discount_info', '')})" if context.user_data.get('extra_discount_info') else ""
+
+        await delete_mode_message(update, context)
+        title = LOCALIZATION[lang]['calc_title_shelf']
+
         result_text = LOCALIZATION[lang]['price_result'].format(
-            title=LOCALIZATION[lang]['calc_title_shelf'],
+            title=title,
             price=price,
             discount=discount,
-            extra="",
-            discounted_price=final
+            extra=extra,
+            discounted_price=discounted_price
         )
-        
-        # Показываем результат и снова ждем выбора скидки (цикл)
-        await send_clean_message(update, context, result_text, keep_result=True)
-        add_to_history(context, result_text)
-        
-        # Возвращаемся к выбору скидки, чтобы можно было посчитать другой товар
         await send_clean_message(
-             update, 
-             context, 
-             LOCALIZATION[lang]['select_discount'], 
-             reply_markup=get_discount_keyboard(context)
+            update,
+            context,
+            result_text,
+            reply_markup=None,
+            keep_result=True,
         )
-        return ВЫБОР_ТИПА_СКИДКИ 
-    except:
+        add_to_history(context, result_text)
+
+        await send_clean_message(
+            update,
+            context,
+            LOCALIZATION[lang]['next_action_prompt'],
+            reply_markup=get_next_actions_keyboard(context),
+        )
+        return ВЫБОР_ТИПА_СКИДКИ
+    except ValueError:
         await send_clean_message(update, context, LOCALIZATION[lang]['invalid_price'])
+        return ОЖИДАНИЕ_ЦЕНЫ
+    except Exception as e:
+        logger.error(f"Error: {e}")
+        await send_clean_message(update, context, LOCALIZATION[lang]['error'])
         return ОЖИДАНИЕ_ЦЕНЫ
 
 # --- N+X ---
 
 async def calculate_n_plus_x(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int:
     lang = get_language(context)
-    await send_clean_message(update, context, LOCALIZATION[lang]['enter_n'])
+    context.user_data['текущее_действие'] = 'menu_nx'
+    context.user_data['попередній_стан'] = ВЫБОР_ТИПА_СКИДКИ
+    context.user_data.pop('n', None)
+    context.user_data.pop('x', None)
+
+    if update.callback_query:
+        await update.callback_query.answer()
+
+    mode_msg = await send_clean_message(
+        update,
+        context,
+        LOCALIZATION[lang]['mode_nx'],
+        reply_markup=None,
+        keep_result=True,
+    )
+    context.user_data['mode_message_id'] = mode_msg.message_id
+
+    await send_clean_message(
+        update,
+        context,
+        LOCALIZATION[lang]['enter_n'],
+        reply_markup=get_numeric_reply_keyboard()
+    )
     return ОЖИДАНИЕ_N
+
 
 async def handle_n_input(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int:
     lang = get_language(context)
-    text = update.message.text
-    if text in LOCALIZATION[lang]['buttons'].values(): return await route_menu_button(update, context)
-    
-    if text.isdigit() and int(text) > 0:
-        context.user_data['n'] = int(text)
-        await send_clean_message(update, context, LOCALIZATION[lang]['enter_x'])
-        return ОЖИДАНИЕ_X
-    await send_clean_message(update, context, LOCALIZATION[lang]['invalid_number'])
-    return ОЖИДАНИЕ_N
+    text = update.message.text.strip()
+    if not text.isdigit():
+        await send_clean_message(update, context, LOCALIZATION[lang]['invalid_number'], reply_markup=get_numeric_reply_keyboard())
+        return ОЖИДАНИЕ_N
+    n = int(text)
+    if n <= 0:
+        await send_clean_message(update, context, LOCALIZATION[lang]['invalid_number'], reply_markup=get_numeric_reply_keyboard())
+        return ОЖИДАНИЕ_N
+    context.user_data['n'] = n
+    context.user_data['попередній_стан'] = ОЖИДАНИЕ_N
+    await send_clean_message(update, context, LOCALIZATION[lang]['enter_x'], reply_markup=get_numeric_reply_keyboard())
+    return ОЖИДАНИЕ_X
+
 
 async def handle_x_input(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int:
     lang = get_language(context)
-    text = update.message.text
-    if text in LOCALIZATION[lang]['buttons'].values(): return await route_menu_button(update, context)
+    text = update.message.text.strip()
+    if not text.isdigit():
+        await send_clean_message(update, context, LOCALIZATION[lang]['invalid_number'], reply_markup=get_numeric_reply_keyboard())
+        return ОЖИДАНИЕ_X
+    x = int(text)
+    if x <= 0:
+        await send_clean_message(update, context, LOCALIZATION[lang]['invalid_number'], reply_markup=get_numeric_reply_keyboard())
+        return ОЖИДАНИЕ_X
+    context.user_data['x'] = x
+    context.user_data['попередній_стан'] = ОЖИДАНИЕ_X
+    await send_clean_message(update, context, LOCALIZATION[lang]['enter_nx_price'], reply_markup=ReplyKeyboardRemove())
+    return ОЖИДАНИЕ_ЦЕНЫ_NX
 
-    if text.isdigit() and int(text) > 0:
-        context.user_data['x'] = int(text)
-        await send_clean_message(update, context, LOCALIZATION[lang]['enter_nx_price'])
-        return ОЖИДАНИЕ_ЦЕНЫ_NX
-    await send_clean_message(update, context, LOCALIZATION[lang]['invalid_number'])
-    return ОЖИДАНИЕ_X
 
 async def handle_nx_price_input(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int:
     lang = get_language(context)
     text = update.message.text.replace(',', '.')
-    if text in LOCALIZATION[lang]['buttons'].values(): return await route_menu_button(update, context)
-
     try:
         price = float(text)
-        n, x = context.user_data['n'], context.user_data['x']
-        total_q = n + x
-        total_sum = price * n
-        unit_price = total_sum / total_q
-        disc_perc = (x / total_q) * 100
-        
-        res = LOCALIZATION[lang]['nx_result'].format(
-            title=LOCALIZATION[lang]['calc_title_nx'],
-            n=n, x=x, price=price, total=total_sum, discount=disc_perc, unit_price=unit_price
+        if price <= 0:
+            await send_clean_message(update, context, LOCALIZATION[lang]['invalid_price'])
+            return ОЖИДАНИЕ_ЦЕНЫ_NX
+        n = context.user_data.get('n')
+        x = context.user_data.get('x')
+        if n is None or x is None:
+            await send_clean_message(update, context, LOCALIZATION[lang]['error'])
+            return ВЫБОР_ТИПА_СКИДКИ
+        total_quantity = n + x
+        discount_percent = (x / total_quantity) * 100
+        unit_price = price * n / total_quantity
+        total_price = price * n
+        await delete_mode_message(update, context)
+        title = LOCALIZATION[lang]['calc_title_nx']
+        result_text = LOCALIZATION[lang]['nx_result'].format(
+            title=title, n=n, x=x, price=price, total=total_price, discount=discount_percent, unit_price=unit_price
         )
-        await send_clean_message(update, context, res, keep_result=True)
-        add_to_history(context, res)
-        # Сразу предлагаем ввести N заново
-        await send_clean_message(update, context, LOCALIZATION[lang]['enter_n'])
-        return ОЖИДАНИЕ_N
-    except:
+        await send_clean_message(update, context, result_text, reply_markup=None, keep_result=True)
+        add_to_history(context, result_text)
+        await send_clean_message(update, context, LOCALIZATION[lang]['next_action_prompt'], reply_markup=get_next_actions_keyboard(context))
+        return ВЫБОР_ТИПА_СКИДКИ
+    except ValueError:
         await send_clean_message(update, context, LOCALIZATION[lang]['invalid_price'])
         return ОЖИДАНИЕ_ЦЕНЫ_NX
+    except Exception:
+        await send_clean_message(update, context, LOCALIZATION[lang]['error'])
+        return ВЫБОР_ТИПА_СКИДКИ
 
-# --- ВЕС ---
+# --- ЦЕНА ВЕСА ---
 
 async def calculate_price_per_kg(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int:
     lang = get_language(context)
-    await send_clean_message(update, context, LOCALIZATION[lang]['enter_weight_price'])
+    context.user_data['текущее_действие'] = 'menu_per_kg'
+    context.user_data['попередній_стан'] = ВЫБОР_ТИПА_СКИДКИ
+    context.user_data.pop('цена_веса', None)
+    if update.callback_query:
+        await update.callback_query.answer()
+    mode_msg = await send_clean_message(update, context, LOCALIZATION[lang]['mode_per_kg'], reply_markup=None, keep_result=True)
+    context.user_data['mode_message_id'] = mode_msg.message_id
+    await send_clean_message(update, context, LOCALIZATION[lang]['enter_weight_price'], reply_markup=None)
     return ОЖИДАНИЕ_ЦЕНЫ_ВЕС
+
 
 async def handle_weight_price_input(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int:
     lang = get_language(context)
     text = update.message.text.replace(',', '.')
-    if text in LOCALIZATION[lang]['buttons'].values(): return await route_menu_button(update, context)
-    
     try:
-        context.user_data['цена_веса'] = float(text)
-        await send_clean_message(update, context, LOCALIZATION[lang]['enter_weight'])
+        price = float(text)
+        if price <= 0:
+            await send_clean_message(update, context, LOCALIZATION[lang]['invalid_price'])
+            return ОЖИДАНИЕ_ЦЕНЫ_ВЕС
+        context.user_data['цена_веса'] = price
+        context.user_data['попередній_стан'] = ОЖИДАНИЕ_ЦЕНЫ_ВЕС
+        await send_clean_message(update, context, LOCALIZATION[lang]['enter_weight'], reply_markup=None)
         return ОЖИДАНИЕ_ГРАММОВ
-    except:
+    except ValueError:
         await send_clean_message(update, context, LOCALIZATION[lang]['invalid_price'])
         return ОЖИДАНИЕ_ЦЕНЫ_ВЕС
+
 
 async def handle_weight_input(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int:
     lang = get_language(context)
     text = update.message.text.replace(',', '.')
-    if text in LOCALIZATION[lang]['buttons'].values(): return await route_menu_button(update, context)
-
     try:
         weight = float(text)
-        price = context.user_data['цена_веса']
+        if weight <= 0:
+            await send_clean_message(update, context, LOCALIZATION[lang]['invalid_number'])
+            return ОЖИДАНИЕ_ГРАММОВ
+        price = context.user_data.get('цена_веса')
+        if not price or price <= 0:
+            await send_clean_message(update, context, LOCALIZATION[lang]['error'])
+            return ОЖИДАНИЕ_ЦЕНЫ_ВЕС
         kg_price = (price / weight) * 1000
-        p100 = (price / weight) * 100
-        
-        res = LOCALIZATION[lang]['weight_result'].format(
-            title=LOCALIZATION[lang]['calc_title_per_kg'],
-            price=price, weight=weight, kg_price=kg_price, price_100g=p100
+        price_100g = (price / weight) * 100
+        await delete_mode_message(update, context)
+        title = LOCALIZATION[lang]['calc_title_per_kg']
+        result_text = LOCALIZATION[lang]['weight_result'].format(
+            title=title, price=price, weight=weight, kg_price=kg_price, price_100g=price_100g
         )
-        await send_clean_message(update, context, res, keep_result=True)
-        add_to_history(context, res)
-        # Цикл
-        await send_clean_message(update, context, LOCALIZATION[lang]['enter_weight_price'])
-        return ОЖИДАНИЕ_ЦЕНЫ_ВЕС
-    except:
+        await send_clean_message(update, context, result_text, reply_markup=None, keep_result=True)
+        add_to_history(context, result_text)
+        context.user_data.pop('цена_веса', None)
+        await send_clean_message(update, context, LOCALIZATION[lang]['next_action_prompt'], reply_markup=get_next_actions_keyboard(context))
+        return ВЫБОР_ТИПА_СКИДКИ
+    except ValueError:
         await send_clean_message(update, context, LOCALIZATION[lang]['invalid_number'])
         return ОЖИДАНИЕ_ГРАММОВ
 
-# --- Original Price ---
+# --- ОБРАТНЫЙ РАСЧЕТ ---
 
 async def calculate_original_price(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int:
     lang = get_language(context)
-    await send_clean_message(update, context, LOCALIZATION[lang]['enter_price'])
+    context.user_data['текущее_действие'] = 'menu_original_price'
+    context.user_data['попередній_стан'] = ВЫБОР_ТИПА_СКИДКИ
+    if update.callback_query:
+        await update.callback_query.answer()
+    mode_msg = await send_clean_message(update, context, LOCALIZATION[lang]['mode_original_price'], reply_markup=None, keep_result=True)
+    context.user_data['mode_message_id'] = mode_msg.message_id
+    await send_clean_message(update, context, LOCALIZATION[lang]['enter_price'], reply_markup=None)
     return ОЖИДАНИЕ_ЦЕНЫ_СО_СКИДКОЙ
+
 
 async def handle_discounted_price(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int:
     lang = get_language(context)
     text = update.message.text.replace(',', '.')
-    if text in LOCALIZATION[lang]['buttons'].values(): return await route_menu_button(update, context)
-
     try:
-        context.user_data['цена_со_скидкой'] = float(text)
-        await send_clean_message(update, context, LOCALIZATION[lang]['enter_custom_discount'])
+        price = float(text)
+        if price <= 0:
+            await send_clean_message(update, context, LOCALIZATION[lang]['invalid_price'])
+            return ОЖИДАНИЕ_ЦЕНЫ_СО_СКИДКОЙ
+        context.user_data['цена_со_скидкой'] = price
+        context.user_data['попередній_стан'] = ОЖИДАНИЕ_ЦЕНЫ_СО_СКИДКОЙ
+        await send_clean_message(update, context, LOCALIZATION[lang]['enter_custom_discount'], reply_markup=None)
         return ОЖИДАНИЕ_ПРОЦЕНТА_СКИДКИ
-    except:
+    except ValueError:
         await send_clean_message(update, context, LOCALIZATION[lang]['invalid_price'])
         return ОЖИДАНИЕ_ЦЕНЫ_СО_СКИДКОЙ
+
 
 async def calculate_original_price_result(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int:
     lang = get_language(context)
     text = update.message.text.replace(',', '.')
-    if text in LOCALIZATION[lang]['buttons'].values(): return await route_menu_button(update, context)
-
     try:
-        disc = float(text)
-        final = context.user_data['цена_со_скидкой']
-        orig = final / (1 - disc / 100)
-        
-        # Используем существующий шаблон price_result для красоты
-        res = LOCALIZATION[lang]['price_result'].format(
-            title=LOCALIZATION[lang]['calc_title_original_price'],
-            price=orig, discount=disc, extra=" (восстановленная)", discounted_price=final
+        discount_percent = float(text)
+        if not (0 < discount_percent < 100):
+            await send_clean_message(update, context, LOCALIZATION[lang]['invalid_discount'])
+            return ОЖИДАНИЕ_ПРОЦЕНТА_СКИДКИ
+        discounted_price = context.user_data.get('цена_со_скидкой', 0)
+        original_price = discounted_price / (1 - discount_percent / 100)
+        await delete_mode_message(update, context)
+        title = LOCALIZATION[lang]['calc_title_original_price']
+        result_text = LOCALIZATION[lang]['price_result'].format(
+            title=title, price=original_price, discount=discount_percent, extra="", discounted_price=discounted_price
         )
-        await send_clean_message(update, context, res, keep_result=True)
-        add_to_history(context, res)
-        await send_clean_message(update, context, LOCALIZATION[lang]['enter_price'])
-        return ОЖИДАНИЕ_ЦЕНЫ_СО_СКИДКОЙ
-    except:
+        await send_clean_message(update, context, result_text, reply_markup=None, keep_result=True)
+        add_to_history(context, result_text)
+        await send_clean_message(update, context, LOCALIZATION[lang]['next_action_prompt'], reply_markup=get_next_actions_keyboard(context))
+        return ВЫБОР_ТИПА_СКИДКИ
+    except ValueError:
         await send_clean_message(update, context, LOCALIZATION[lang]['invalid_discount'])
         return ОЖИДАНИЕ_ПРОЦЕНТА_СКИДКИ
 
-# --- PRO MENU (Inline) ---
+# ===== PRO МЕНЮ =====
 
 async def open_pro_menu(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int:
     lang = get_language(context)
-    # Показываем PRO меню как Inline (так как там много опций)
-    await send_clean_message(
-        update,
-        context,
-        LOCALIZATION[lang]['pro_menu_title'],
-        reply_markup=get_pro_menu_keyboard(context)
-    )
+    if update.callback_query:
+        await update.callback_query.answer()
+    context.user_data['попередній_стан'] = ВЫБОР_ТИПА_СКИДКИ
+    await send_clean_message(update, context, LOCALIZATION[lang]['pro_menu_title'], reply_markup=get_pro_menu_keyboard(context))
     return PRO_MENU
 
-async def pro_callback_handler(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int:
-    # Заглушка для обработки кнопок PRO (чтобы код не был бесконечным)
-    # Вы можете добавить сюда логику из предыдущих версий для PRO
-    await update.callback_query.answer()
-    await update.callback_query.message.reply_text("Функция PRO выбрана (добавьте логику)")
-    return PRO_MENU
+# --- PRO Auto ---
 
-# --- ГЛАВНЫЙ МАРШРУТИЗАТОР МЕНЮ ---
-# Эта функция проверяет, какую кнопку нажал пользователь в нижнем меню
+def parse_automode_expression(text: str):
+    t = text.lower().replace(',', '.').strip()
+    m = re.search(r'(\d+(?:\.\d+)?)\s*[-−]\s*(\d+(?:\.\d+)?)\s*%', t)
+    if m:
+        price, disc = float(m.group(1)), float(m.group(2))
+        if price > 0 and 0 < disc < 100: return {'type': 'percent', 'price': price, 'discount': disc}
+    m = re.search(r'(\d+)\s*\+\s*(\d+)', t)
+    if m:
+        n, x = int(m.group(1)), int(m.group(2))
+        m_price = re.search(r'(\d+(?:\.\d+)?)', t[m.end():])
+        if m_price and n > 0 and x > 0: return {'type': 'nx', 'n': n, 'x': x, 'price': float(m_price.group(1))}
+    m = re.search(r'(\d+(?:\.\d+)?)\s*(г|гр|грамм|грамів|мл|ml)\s*(за|x|×)\s*(\d+(?:\.\d+)?)', t)
+    if m: return {'type': 'per_kg', 'weight': float(m.group(1)), 'price': float(m.group(4))}
+    m = re.search(r'(\d+(?:\.\d+)?)\s*(за)\s*(\d+(?:\.\d+)?)\s*(г|гр|грамм|грамів|мл|ml)', t)
+    if m: return {'type': 'per_kg', 'weight': float(m.group(3)), 'price': float(m.group(1))}
+    return None
 
-async def route_menu_button(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int:
-    text = update.message.text
+async def pro_auto_start(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int:
     lang = get_language(context)
-    b = LOCALIZATION[lang]['buttons']
-    
-    if text == b['shelf']:
-        return await calculate_shelf_discount(update, context)
-    elif text == b['nx']:
-        return await calculate_n_plus_x(update, context)
-    elif text == b['kg']:
-        return await calculate_price_per_kg(update, context)
-    elif text == b['orig']:
-        return await calculate_original_price(update, context)
-    elif text == b['pro']:
-        return await open_pro_menu(update, context)
-    elif text == b['settings']:
-        return await settings_menu(update, context)
-    elif text == b['restart']:
-        return await restart(update, context)
-    
-    # Если текст не кнопка - игнорируем или просим нажать кнопку
-    await update.message.reply_text(LOCALIZATION[lang]['unexpected_text'])
+    if update.callback_query: await update.callback_query.answer()
+    context.user_data['попередній_стан'] = PRO_MENU
+    mode_msg = await send_clean_message(update, context, LOCALIZATION[lang]['mode_pro_auto'], reply_markup=None, keep_result=True)
+    context.user_data['mode_message_id'] = mode_msg.message_id
+    await send_clean_message(update, context, LOCALIZATION[lang]['pro_enter_expression'], reply_markup=None)
+    return PRO_AUTOMODE_INPUT
+
+async def pro_handle_automode(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int:
+    lang = get_language(context)
+    parsed = parse_automode_expression(update.message.text)
+    if not parsed:
+        await send_clean_message(update, context, LOCALIZATION[lang]['pro_auto_unknown'])
+        return PRO_AUTOMODE_INPUT
+    await delete_mode_message(update, context)
+    if parsed['type'] == 'percent':
+        res = f"🤖 Авто: {parsed['price']} - {parsed['discount']}%\n✅ {parsed['price']*(1-parsed['discount']/100):.2f} грн"
+    elif parsed['type'] == 'nx':
+        n, x, p = parsed['n'], parsed['x'], parsed['price']
+        res = f"🤖 Авто: {n}+{x}\n✅ Единица: {p*n/(n+x):.2f} грн (Всего: {p*n:.2f})"
+    elif parsed['type'] == 'per_kg':
+        w, p = parsed['weight'], parsed['price']
+        res = f"🤖 Авто: вес\n✅ 1 кг: {(p/w)*1000:.2f} грн"
+    await send_clean_message(update, context, res, reply_markup=None, keep_result=True)
+    add_to_history(context, res)
+    await send_clean_message(update, context, LOCALIZATION[lang]['next_action_prompt'], reply_markup=get_next_actions_keyboard(context))
+    return ВЫБОР_ТИПА_СКИДКИ
+
+# --- PRO Handlers (Fixed, Loyal, Double, Compare, Promo, Margin, History) ---
+# Для краткости приведены стартеры и обработчики
+
+async def pro_fixed_start(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int:
+    lang = get_language(context)
+    if update.callback_query: await update.callback_query.answer()
+    context.user_data['попередній_стан'] = PRO_MENU
+    mode_msg = await send_clean_message(update, context, LOCALIZATION[lang]['mode_pro_fixed'], reply_markup=None, keep_result=True)
+    context.user_data['mode_message_id'] = mode_msg.message_id
+    await send_clean_message(update, context, LOCALIZATION[lang]['pro_fixed_enter_price'], reply_markup=None)
+    return PRO_FIXED_PRICE
+
+async def pro_fixed_price_input(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int:
+    try:
+        context.user_data['pro_fixed_price'] = float(update.message.text.replace(',', '.'))
+        await send_clean_message(update, context, LOCALIZATION[get_language(context)]['pro_fixed_enter_discount_sum'])
+        return PRO_FIXED_DISCOUNT
+    except:
+        await send_clean_message(update, context, LOCALIZATION[get_language(context)]['pro_invalid_number'])
+        return PRO_FIX_PRICE
+
+async def pro_fixed_discount_input(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int:
+    try:
+        disc = float(update.message.text.replace(',', '.'))
+        price = context.user_data.get('pro_fixed_price')
+        await delete_mode_message(update, context)
+        res = f"💸 Фикс. скидка\n💰 Цена: {price}\n⬇️ Скидка: {disc}\n✅ Итог: {price-disc:.2f} грн"
+        await send_clean_message(update, context, res, keep_result=True)
+        add_to_history(context, res)
+        await send_clean_message(update, context, LOCALIZATION[get_language(context)]['next_action_prompt'], reply_markup=get_next_actions_keyboard(context))
+        return ВЫБОР_ТИПА_СКИДКИ
+    except: return PRO_FIXED_DISCOUNT
+
+async def pro_loyal_start(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int:
+    if update.callback_query: await update.callback_query.answer()
+    context.user_data['попередній_стан'] = PRO_MENU
+    await send_clean_message(update, context, LOCALIZATION[get_language(context)]['pro_loyal_enter_regular'])
+    return PRO_LOYAL_ORIGINAL
+
+async def pro_loyal_original_input(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int:
+    try:
+        context.user_data['pro_loyal_original'] = float(update.message.text.replace(',', '.'))
+        await send_clean_message(update, context, LOCALIZATION[get_language(context)]['pro_loyal_enter_card'])
+        return PRO_LOYAL_CARD
+    except: return PRO_LOYAL_ORIGINAL
+
+async def pro_loyal_card_input(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int:
+    try:
+        card = float(update.message.text.replace(',', '.'))
+        orig = context.user_data.get('pro_loyal_original')
+        res = f"💳 Карта\n💰 Без: {orig}\n💳 С картой: {card}\n⬇️ Выгода: {orig-card:.2f}"
+        await send_clean_message(update, context, res, keep_result=True)
+        add_to_history(context, res)
+        await send_clean_message(update, context, LOCALIZATION[get_language(context)]['next_action_prompt'], reply_markup=get_next_actions_keyboard(context))
+        return ВЫБОР_ТИПА_СКИДКИ
+    except: return PRO_LOYAL_CARD
+
+async def pro_double_start(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int:
+    if update.callback_query: await update.callback_query.answer()
+    context.user_data['попередній_стан'] = PRO_MENU
+    await send_clean_message(update, context, LOCALIZATION[get_language(context)]['pro_double_enter_price'])
+    return PRO_DOUBLE_PRICE
+
+async def pro_double_price_input(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int:
+    try:
+        context.user_data['pro_double_price'] = float(update.message.text.replace(',', '.'))
+        await send_clean_message(update, context, LOCALIZATION[get_language(context)]['pro_double_enter_first'])
+        return PRO_DOUBLE_DISC1
+    except: return PRO_DOUBLE_PRICE
+
+async def pro_double_disc1_input(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int:
+    try:
+        context.user_data['pro_double_disc1'] = float(update.message.text.replace(',', '.'))
+        await send_clean_message(update, context, LOCALIZATION[get_language(context)]['pro_double_enter_second'])
+        return PRO_DOUBLE_DISC2
+    except: return PRO_DOUBLE_DISC1
+
+async def pro_double_disc2_input(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int:
+    try:
+        d2 = float(update.message.text.replace(',', '.'))
+        p = context.user_data.get('pro_double_price')
+        d1 = context.user_data.get('pro_double_disc1')
+        final = p * (1-d1/100) * (1-d2/100)
+        res = f"🔁 Двойная\n💰 {p}\n1️⃣ -{d1}%\n2️⃣ -{d2}%\n✅ {final:.2f} грн"
+        await send_clean_message(update, context, res, keep_result=True)
+        add_to_history(context, res)
+        await send_clean_message(update, context, LOCALIZATION[get_language(context)]['next_action_prompt'], reply_markup=get_next_actions_keyboard(context))
+        return ВЫБОР_ТИПА_СКИДКИ
+    except: return PRO_DOUBLE_DISC2
+
+async def pro_compare_start(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int:
+    if update.callback_query: await update.callback_query.answer()
+    context.user_data['попередній_стан'] = PRO_MENU
+    await send_clean_message(update, context, LOCALIZATION[get_language(context)]['pro_compare_first_price'])
+    return PRO_COMPARE_FIRST_PRICE
+
+async def pro_compare_first_price_input(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int:
+    context.user_data['cmp_p1'] = float(update.message.text.replace(',', '.'))
+    await send_clean_message(update, context, LOCALIZATION[get_language(context)]['pro_compare_first_weight'])
+    return PRO_COMPARE_FIRST_WEIGHT
+
+async def pro_compare_first_weight_input(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int:
+    context.user_data['cmp_w1'] = float(update.message.text.replace(',', '.'))
+    await send_clean_message(update, context, LOCALIZATION[get_language(context)]['pro_compare_second_price'])
+    return PRO_COMPARE_SECOND_PRICE
+
+async def pro_compare_second_price_input(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int:
+    context.user_data['cmp_p2'] = float(update.message.text.replace(',', '.'))
+    await send_clean_message(update, context, LOCALIZATION[get_language(context)]['pro_compare_second_weight'])
+    return PRO_COMPARE_SECOND_WEIGHT
+
+async def pro_compare_second_weight_input(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int:
+    w2 = float(update.message.text.replace(',', '.'))
+    p1, w1 = context.user_data['cmp_p1'], context.user_data['cmp_w1']
+    p2 = context.user_data['cmp_p2']
+    kg1 = p1/w1*1000
+    kg2 = p2/w2*1000
+    res = f"⚖️ Сравнение\n1️⃣ {kg1:.2f} грн/кг\n2️⃣ {kg2:.2f} грн/кг\n✅ Выгоднее: {'1' if kg1<kg2 else '2'}"
+    await send_clean_message(update, context, res, keep_result=True)
+    add_to_history(context, res)
+    await send_clean_message(update, context, LOCALIZATION[get_language(context)]['next_action_prompt'], reply_markup=get_next_actions_keyboard(context))
+    return ВЫБОР_ТИПА_СКИДКИ
+
+async def pro_promo_start(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int:
+    if update.callback_query: await update.callback_query.answer()
+    context.user_data['попередній_стан'] = PRO_MENU
+    await send_clean_message(update, context, LOCALIZATION[get_language(context)]['pro_promo_old_price'])
+    return PRO_PROMO_OLD
+
+async def pro_promo_old_input(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int:
+    context.user_data['promo_old'] = float(update.message.text.replace(',', '.'))
+    await send_clean_message(update, context, LOCALIZATION[get_language(context)]['pro_promo_new_price'])
+    return PRO_PROMO_NEW
+
+async def pro_promo_new_input(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int:
+    new_p = float(update.message.text.replace(',', '.'))
+    old_p = context.user_data['promo_old']
+    res = f"📉 Промо\n💵 Было: {old_p}\n💸 Стало: {new_p}\n⬇️ Скидка: {(old_p-new_p)/old_p*100:.1f}%"
+    await send_clean_message(update, context, res, keep_result=True)
+    add_to_history(context, res)
+    await send_clean_message(update, context, LOCALIZATION[get_language(context)]['next_action_prompt'], reply_markup=get_next_actions_keyboard(context))
+    return ВЫБОР_ТИПА_СКИДКИ
+
+async def pro_margin_start(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int:
+    if update.callback_query: await update.callback_query.answer()
+    context.user_data['попередній_стан'] = PRO_MENU
+    await send_clean_message(update, context, LOCALIZATION[get_language(context)]['pro_margin_cost'])
+    return PRO_MARGIN_COST
+
+async def pro_margin_cost_input(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int:
+    context.user_data['margin_cost'] = float(update.message.text.replace(',', '.'))
+    await send_clean_message(update, context, LOCALIZATION[get_language(context)]['pro_margin_shelf'])
+    return PRO_MARGIN_SHELF
+
+async def pro_margin_shelf_input(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int:
+    shelf = float(update.message.text.replace(',', '.'))
+    cost = context.user_data['margin_cost']
+    profit = shelf - cost
+    res = f"📊 Маржа\n💰 Прибыль: {profit:.2f}\n📈 Наценка: {profit/cost*100:.1f}%\n📉 Маржа: {profit/shelf*100:.1f}%"
+    await send_clean_message(update, context, res, keep_result=True)
+    add_to_history(context, res)
+    await send_clean_message(update, context, LOCALIZATION[get_language(context)]['next_action_prompt'], reply_markup=get_next_actions_keyboard(context))
+    return ВЫБОР_ТИПА_СКИДКИ
+
+async def pro_show_history(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int:
+    if update.callback_query: await update.callback_query.answer()
+    hist = context.user_data.get("history", [])
+    text = "\n\n".join(hist) if hist else "История пуста"
+    await send_clean_message(update, context, text, keep_result=True)
+    await send_clean_message(update, context, LOCALIZATION[get_language(context)]['next_action_prompt'], reply_markup=get_next_actions_keyboard(context))
+    return ВЫБОР_ТИПА_СКИДКИ
+
+# --- ОБЩИЕ ---
+
+async def back(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int:
+    lang = get_language(context)
+    prev = context.user_data.get('попередній_стан', ВЫБОР_ТИПА_СКИДКИ)
+    state_map = {
+        ВЫБОР_ТИПА_СКИДКИ: start,
+        ОЖИДАНИЕ_СВОЕЙ_СКИДКИ: calculate_shelf_discount,
+        ОЖИДАНИЕ_ЦЕНЫ: calculate_shelf_discount,
+        ОЖИДАНИЕ_N: start,
+        ОЖИДАНИЕ_X: calculate_n_plus_x,
+        ОЖИДАНИЕ_ЦЕНЫ_NX: handle_x_input,
+        ОЖИДАНИЕ_ЦЕНЫ_ВЕС: start,
+        ОЖИДАНИЕ_ГРАММОВ: calculate_price_per_kg,
+        ОЖИДАНИЕ_ЦЕНЫ_СО_СКИДКОЙ: calculate_original_price,
+        ОЖИДАНИЕ_ПРОЦЕНТА_СКИДКИ: handle_discounted_price,
+        НАСТРОЙКИ: start,
+        ВЫБОР_ЯЗЫКА: start,
+        PRO_MENU: start,
+        PRO_AUTOMODE_INPUT: open_pro_menu,
+        PRO_FIXED_PRICE: open_pro_menu,
+        PRO_FIXED_DISCOUNT: open_pro_menu,
+        PRO_LOYAL_ORIGINAL: open_pro_menu,
+        PRO_LOYAL_CARD: open_pro_menu,
+        PRO_DOUBLE_PRICE: open_pro_menu,
+        PRO_DOUBLE_DISC1: open_pro_menu,
+        PRO_DOUBLE_DISC2: open_pro_menu,
+        PRO_COMPARE_FIRST_PRICE: open_pro_menu,
+        PRO_COMPARE_FIRST_WEIGHT: open_pro_menu,
+        PRO_COMPARE_SECOND_PRICE: open_pro_menu,
+        PRO_COMPARE_SECOND_WEIGHT: open_pro_menu,
+        PRO_PROMO_OLD: open_pro_menu,
+        PRO_PROMO_NEW: open_pro_menu,
+        PRO_MARGIN_COST: open_pro_menu,
+        PRO_MARGIN_SHELF: open_pro_menu,
+    }
+    handler = state_map.get(prev, start)
+    return await handler(update, context)
+
+async def error_handler(update: object, context: ContextTypes.DEFAULT_TYPE | None) -> None:
+    logger.error(f"Error: {context.error}")
+
+async def cancel(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int:
+    await send_clean_message(update, context, "Отмена", reply_markup=ReplyKeyboardRemove())
+    return ConversationHandler.END
+
+async def restart(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int:
+    if update.callback_query: await update.callback_query.answer()
+    context.user_data.clear()
+    context.user_data['language'] = 'ru'
+    await start(update, context)
+    return ВЫБОР_ЯЗЫКА
+
+async def handle_unexpected_text(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int:
+    lang = get_language(context)
+    if context.user_data.get("текущее_действие") == "menu_shelf_discount":
+        try:
+            val = float(update.message.text.replace(',', '.').replace('%', ''))
+            if 0 < val < 100:
+                context.user_data["скидка"] = val
+                await send_clean_message(update, context, LOCALIZATION[lang]["enter_price"])
+                return ОЖИДАНИЕ_ЦЕНЫ
+        except: pass
+    await send_clean_message(update, context, LOCALIZATION[lang]["unexpected_text"])
     return ВЫБОР_ТИПА_СКИДКИ
 
 # ===== ЗАПУСК =====
 
 def get_application():
     if not TOKEN:
-        raise ValueError("Токен не найден!")
+        raise ValueError("Токен не найден! Проверь переменные окружения.")
     app = ApplicationBuilder().token(TOKEN).build()
-    
-    # Регулярки для кнопок меню (чтобы ловить их в любом состоянии)
-    # Мы собираем все названия кнопок на обоих языках
-    menu_buttons = []
-    for l in LOCALIZATION.values():
-        menu_buttons.extend(l['buttons'].values())
-    menu_filter = filters.Regex(f"^({'|'.join(map(re.escape, menu_buttons))})$")
-
-    # В любом состоянии диалога, если нажата кнопка меню -> идем в route_menu_button
-    # Это делается через entry_points (если мы в начале) или через fallbacks (если мы внутри процесса)
+    app.add_error_handler(error_handler)
     
     conv_handler = ConversationHandler(
-        entry_points=[
-            CommandHandler("start", start),
-            MessageHandler(menu_filter, route_menu_button)
-        ],
+        entry_points=[CommandHandler("start", start)],
         states={
-            ВЫБОР_ЯЗЫКА: [CallbackQueryHandler(choose_language, pattern="^lang_")],
-            
-            # Главное состояние ожидания
+            ВЫБОР_ЯЗЫКА: [CallbackQueryHandler(choose_language, pattern="^lang_(ru|uk)$"), CommandHandler("start", start)],
             ВЫБОР_ТИПА_СКИДКИ: [
-                MessageHandler(menu_filter, route_menu_button),
-                # Если нажали Inline кнопку процента (когда мы в режиме скидок)
+                CallbackQueryHandler(calculate_shelf_discount, pattern="^menu_shelf_discount$"),
+                CallbackQueryHandler(calculate_n_plus_x, pattern="^menu_nx$"),
+                CallbackQueryHandler(calculate_price_per_kg, pattern="^menu_per_kg$"),
+                CallbackQueryHandler(calculate_original_price, pattern="^menu_original_price$"),
+                CallbackQueryHandler(open_pro_menu, pattern="^menu_pro$"),
                 CallbackQueryHandler(handle_fixed_discount, pattern="^(5|10|15|20|25|30|35|40|45|50)$"),
-                CallbackQueryHandler(custom_discount, pattern="^другая_скидка$"),
-                # PRO
-                CallbackQueryHandler(pro_callback_handler, pattern="^pro_"),
+                CallbackQueryHandler(custom_discount, pattern="^(другая_скидка|інша_знижка)$"),
+                CallbackQueryHandler(settings_menu, pattern="^настройки$"),
+                CallbackQueryHandler(restart, pattern="^перезапустить_бот$"),
+                CommandHandler("start", restart),
+                MessageHandler(filters.TEXT & ~filters.COMMAND, handle_unexpected_text),
             ],
-            
-            # Состояния ввода данных
-            # В каждом из них мы сначала проверяем menu_filter (вдруг юзер передумал и нажал другую кнопку)
-            ОЖИДАНИЕ_ЦЕНЫ: [MessageHandler(menu_filter, route_menu_button), MessageHandler(filters.TEXT, handle_price_input)],
-            ОЖИДАНИЕ_СВОЕЙ_СКИДКИ: [MessageHandler(menu_filter, route_menu_button), MessageHandler(filters.TEXT, handle_discount_input)],
-            
-            # N+X
-            ОЖИДАНИЕ_N: [MessageHandler(menu_filter, route_menu_button), MessageHandler(filters.TEXT, handle_n_input)],
-            ОЖИДАНИЕ_X: [MessageHandler(menu_filter, route_menu_button), MessageHandler(filters.TEXT, handle_x_input)],
-            ОЖИДАНИЕ_ЦЕНЫ_NX: [MessageHandler(menu_filter, route_menu_button), MessageHandler(filters.TEXT, handle_nx_price_input)],
-            
-            # Вес
-            ОЖИДАНИЕ_ЦЕНЫ_ВЕС: [MessageHandler(menu_filter, route_menu_button), MessageHandler(filters.TEXT, handle_weight_price_input)],
-            ОЖИДАНИЕ_ГРАММОВ: [MessageHandler(menu_filter, route_menu_button), MessageHandler(filters.TEXT, handle_weight_input)],
-            
-            # Orig
-            ОЖИДАНИЕ_ЦЕНЫ_СО_СКИДКОЙ: [MessageHandler(menu_filter, route_menu_button), MessageHandler(filters.TEXT, handle_discounted_price)],
-            ОЖИДАНИЕ_ПРОЦЕНТА_СКИДКИ: [MessageHandler(menu_filter, route_menu_button), MessageHandler(filters.TEXT, calculate_original_price_result)],
-
-            # Settings
-            НАСТРОЙКИ: [CallbackQueryHandler(change_language, pattern="^сменить_язык$"), MessageHandler(menu_filter, route_menu_button)],
-            
-            # PRO (меню)
-            PRO_MENU: [CallbackQueryHandler(pro_callback_handler, pattern="^pro_"), MessageHandler(menu_filter, route_menu_button)],
+            ОЖИДАНИЕ_СВОЕЙ_СКИДКИ: [MessageHandler(filters.TEXT, handle_discount_input), CallbackQueryHandler(back, pattern="^назад$")],
+            ОЖИДАНИЕ_ЦЕНЫ: [MessageHandler(filters.TEXT, handle_price_input), CallbackQueryHandler(back, pattern="^назад$")],
+            ОЖИДАНИЕ_N: [MessageHandler(filters.TEXT, handle_n_input)],
+            ОЖИДАНИЕ_X: [MessageHandler(filters.TEXT, handle_x_input)],
+            ОЖИДАНИЕ_ЦЕНЫ_NX: [MessageHandler(filters.TEXT, handle_nx_price_input), CallbackQueryHandler(back, pattern="^назад$")],
+            ОЖИДАНИЕ_ЦЕНЫ_ВЕС: [MessageHandler(filters.TEXT, handle_weight_price_input), CallbackQueryHandler(back, pattern="^назад$")],
+            ОЖИДАНИЕ_ГРАММОВ: [MessageHandler(filters.TEXT, handle_weight_input), CallbackQueryHandler(back, pattern="^назад$")],
+            ОЖИДАНИЕ_ЦЕНЫ_СО_СКИДКОЙ: [MessageHandler(filters.TEXT, handle_discounted_price), CallbackQueryHandler(back, pattern="^назад$")],
+            ОЖИДАНИЕ_ПРОЦЕНТА_СКИДКИ: [MessageHandler(filters.TEXT, calculate_original_price_result), CallbackQueryHandler(back, pattern="^назад$")],
+            НАСТРОЙКИ: [CallbackQueryHandler(change_language, pattern="^сменить_язык$"), CallbackQueryHandler(back, pattern="^назад$")],
+            PRO_MENU: [
+                CallbackQueryHandler(pro_auto_start, pattern="^pro_auto$"),
+                CallbackQueryHandler(pro_fixed_start, pattern="^pro_fixed$"),
+                CallbackQueryHandler(pro_loyal_start, pattern="^pro_loyal$"),
+                CallbackQueryHandler(pro_double_start, pattern="^pro_double$"),
+                CallbackQueryHandler(pro_compare_start, pattern="^pro_compare$"),
+                CallbackQueryHandler(pro_promo_start, pattern="^pro_promo$"),
+                CallbackQueryHandler(pro_margin_start, pattern="^pro_margin$"),
+                CallbackQueryHandler(pro_show_history, pattern="^pro_history$"),
+                CallbackQueryHandler(back, pattern="^назад$")
+            ],
+            PRO_AUTOMODE_INPUT: [MessageHandler(filters.TEXT, pro_handle_automode), CallbackQueryHandler(back, pattern="^назад$")],
+            PRO_FIXED_PRICE: [MessageHandler(filters.TEXT, pro_fixed_price_input), CallbackQueryHandler(back, pattern="^назад$")],
+            PRO_FIXED_DISCOUNT: [MessageHandler(filters.TEXT, pro_fixed_discount_input), CallbackQueryHandler(back, pattern="^назад$")],
+            PRO_LOYAL_ORIGINAL: [MessageHandler(filters.TEXT, pro_loyal_original_input), CallbackQueryHandler(back, pattern="^назад$")],
+            PRO_LOYAL_CARD: [MessageHandler(filters.TEXT, pro_loyal_card_input), CallbackQueryHandler(back, pattern="^назад$")],
+            PRO_DOUBLE_PRICE: [MessageHandler(filters.TEXT, pro_double_price_input), CallbackQueryHandler(back, pattern="^назад$")],
+            PRO_DOUBLE_DISC1: [MessageHandler(filters.TEXT, pro_double_disc1_input), CallbackQueryHandler(back, pattern="^назад$")],
+            PRO_DOUBLE_DISC2: [MessageHandler(filters.TEXT, pro_double_disc2_input), CallbackQueryHandler(back, pattern="^назад$")],
+            PRO_COMPARE_FIRST_PRICE: [MessageHandler(filters.TEXT, pro_compare_first_price_input), CallbackQueryHandler(back, pattern="^назад$")],
+            PRO_COMPARE_FIRST_WEIGHT: [MessageHandler(filters.TEXT, pro_compare_first_weight_input), CallbackQueryHandler(back, pattern="^назад$")],
+            PRO_COMPARE_SECOND_PRICE: [MessageHandler(filters.TEXT, pro_compare_second_price_input), CallbackQueryHandler(back, pattern="^назад$")],
+            PRO_COMPARE_SECOND_WEIGHT: [MessageHandler(filters.TEXT, pro_compare_second_weight_input), CallbackQueryHandler(back, pattern="^назад$")],
+            PRO_PROMO_OLD: [MessageHandler(filters.TEXT, pro_promo_old_input), CallbackQueryHandler(back, pattern="^назад$")],
+            PRO_PROMO_NEW: [MessageHandler(filters.TEXT, pro_promo_new_input), CallbackQueryHandler(back, pattern="^назад$")],
+            PRO_MARGIN_COST: [MessageHandler(filters.TEXT, pro_margin_cost_input), CallbackQueryHandler(back, pattern="^назад$")],
+            PRO_MARGIN_SHELF: [MessageHandler(filters.TEXT, pro_margin_shelf_input), CallbackQueryHandler(back, pattern="^назад$")],
         },
-        fallbacks=[CommandHandler("start", restart)],
+        fallbacks=[CommandHandler("cancel", cancel), CommandHandler("start", restart), CallbackQueryHandler(restart, pattern="^перезапустить_бот$")],
         per_chat=True
     )
-    
     app.add_handler(conv_handler)
     return app
 
-# Алиас
+# Функция-псевдоним, чтобы работать со старой версией api/index.py если вы ее не обновили
 register_handlers = get_application
