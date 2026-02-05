@@ -1,39 +1,40 @@
 import os
-import json
 import asyncio
 from fastapi import FastAPI, Request
 from telegram import Update
-from telegram.ext import ApplicationBuilder
+# Импортируем функцию создания бота из твоего файла bot.py
+# Используем get_application, так как в новом bot.py это главная функция
+from bot import get_application
 
-# Импортируем функцию регистрации из вашего файла bot.py
-from bot import register_handlers
-
-# Инициализируем FastAPI
 app = FastAPI()
 
-# Получаем токен из переменных окружения
-TOKEN = os.getenv("TOKEN")
+# Глобальная переменная для приложения
+ptb_app = None
 
-# Создаем приложение бота глобально, чтобы не пересоздавать при каждом запросе (по возможности)
-bot_app = ApplicationBuilder().token(TOKEN).build()
-bot_app = register_handlers(bot_app)
+@app.on_event("startup")
+async def startup_event():
+    """Инициализация бота при старте сервера"""
+    global ptb_app
+    if ptb_app is None:
+        # get_application() сама создает и возвращает готовое приложение
+        ptb_app = get_application()
+        await ptb_app.initialize()
 
 @app.post("/api/webhook")
-async def telegram_webhook(request: Request):
-    """
-    Эта функция получает обновления от Telegram
-    и передает их в python-telegram-bot
-    """
-    # 1. Получаем JSON из запроса
+async def webhook(request: Request):
+    """Обработчик входящих сообщений от Telegram"""
+    global ptb_app
+    
+    # На случай холодного старта, если startup не сработал
+    if ptb_app is None:
+        ptb_app = get_application()
+        await ptb_app.initialize()
+
+    # Получаем данные и обрабатываем
     data = await request.json()
+    update = Update.de_json(data, ptb_app.bot)
     
-    # 2. Преобразуем JSON в объект Update
-    update = Update.de_json(data, bot_app.bot)
-    
-    # 3. Инициализируем приложение бота (если нужно) и обрабатываем обновление
-    async with bot_app:
-        # Важно: process_update обрабатывает одно сообщение
-        await bot_app.process_update(update)
+    await ptb_app.process_update(update)
     
     return {"status": "ok"}
 
