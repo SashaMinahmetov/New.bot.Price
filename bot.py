@@ -915,10 +915,15 @@ async def cancel(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int:
 
 async def restart(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int:
     if update.callback_query: await update.callback_query.answer()
+    
+    # Сохраняем текущий язык, чтобы не спрашивать снова
+    current_lang = context.user_data.get('language', 'ru')
+    
     context.user_data.clear()
-    context.user_data['language'] = 'ru'
-    await start(update, context)
-    return ВЫБОР_ЯЗЫКА
+    context.user_data['language'] = current_lang
+    
+    # Передаем управление в start, который вернет ВЫБОР_ТИПА_СКИДКИ
+    return await start(update, context)
 
 async def handle_unexpected_text(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int:
     lang = get_language(context)
