@@ -1,14 +1,12 @@
 import os
 import logging
-import re
 import asyncio
 from telegram import (
     Update,
     InlineKeyboardButton,
     InlineKeyboardMarkup,
-    ReplyKeyboardMarkup,
+    WebAppInfo,
     ReplyKeyboardRemove,
-    WebAppInfo,  # <--- Добавили для Mini App
 )
 from telegram.ext import (
     ApplicationBuilder,
@@ -23,7 +21,7 @@ from telegram.ext import (
 # Получаем токен
 TOKEN = os.getenv("TOKEN")
 # ССЫЛКА НА ТВОЙ MINI APP (Замени на свою!)
-MINI_APP_URL = "https://t.me/e_discount_bot/app" 
+MINI_APP_URL = "https://google.com" 
 
 # Состояния диалога
 (
@@ -38,8 +36,8 @@ MINI_APP_URL = "https://t.me/e_discount_bot/app"
     ОЖИДАНИЕ_ГРАММОВ,
     ОЖИДАНИЕ_ЦЕНЫ_СО_СКИДКОЙ,
     ОЖИДАНИЕ_ПРОЦЕНТА_СКИДКИ,
-    ОЖИДАНИЕ_ЗАКУПКИ,      
-    ОЖИДАНИЕ_ПОЛКИ_МАРЖА,  
+    ОЖИДАНИЕ_ЗАКУПКИ,      # Для маржи
+    ОЖИДАНИЕ_ПОЛКИ_МАРЖА,  # Для маржи
     НАСТРОЙКИ,
 ) = range(14)
 
@@ -59,7 +57,6 @@ LOCALIZATION = {
         'enter_custom_discount': "🎯 <b>Введите свою скидку (%):</b>\n<i>Например: 15 или 14.5</i>",
         'enter_price': "🏷 <b>Введите цену на полке:</b>\n<i>Например: 545.00</i>",
         
-        # Обновленный красивый дизайн результата (Стиль Чека)
         'price_result': (
             "{title}\n\n"
             "💵 Цена:    <code>{price:.2f} ₴</code>\n"
@@ -70,7 +67,6 @@ LOCALIZATION = {
         
         'invalid_discount': "❌ <b>Ошибка!</b> Скидка должна быть от 0% до 100%.",
         'invalid_price': "❌ <b>Ошибка!</b> Введите корректное число (например: <code>545.44</code>).",
-        
         'enter_n': "🔢 <b>Количество к покупке (N):</b>",
         'enter_x': "🎁 <b>Количество в подарок (X):</b>",
         'enter_nx_price': "💰 <b>Цена за одну штуку:</b>",
@@ -103,10 +99,10 @@ LOCALIZATION = {
         'error': '❌ Произошла ошибка. Введите /start.',
         'cancel': "❌ Отменено. Введите /start.",
         'restart': "🔄 Бот перезапущен!",
-        'unexpected_text': "⚠️ <b>Пожалуйста, используйте кнопки меню.</b>",
+        'unexpected_text': "⚠️ <b>Пожалуйста, используйте кнопки меню ниже:</b>",
         'settings_menu': "⚙️ <b>Настройки:</b>",
         'change_language': "🌐 Сменить язык",
-        'clear_chat_btn': "🗑 Очистить историю",
+        'clear_chat_btn': "🗑 Очистить чат",
         'chat_cleared': "✅ <b>История переписки удалена!</b>",
         'back': "🔙 Назад",
         'back_to_menu_btn': "🏠 В меню",
@@ -114,7 +110,7 @@ LOCALIZATION = {
         'restart_btn': "🔄 Перезапуск",
         'btn_show_calc': "📝 Показать формулу",
         'btn_hide_calc': "🙈 Скрыть формулу",
-        'btn_miniapp': "📱 Открыть Приложение", # Кнопка Mini App
+        'btn_miniapp': "📱 Открыть Приложение",
         
         'expl_header': "\n\n📝 <b>Детали расчета:</b>\n",
         'expl_shelf': "<code>{price} - ({price} × {discount} / 100) = </code><b>{result:.2f}</b>",
@@ -199,10 +195,10 @@ LOCALIZATION = {
         'error': '❌ Помилка. Введіть /start.',
         'cancel': "❌ Скасовано. Введіть /start.",
         'restart': "🔄 Бот перезапущено!",
-        'unexpected_text': "⚠️ <b>Будь ласка, використовуйте кнопки меню.</b>",
+        'unexpected_text': "⚠️ <b>Будь ласка, використовуйте кнопки меню нижче:</b>",
         'settings_menu': "⚙️ <b>Налаштування:</b>",
         'change_language': "🌐 Змінити мову",
-        'clear_chat_btn': "🗑 Очистити історію",
+        'clear_chat_btn': "🗑 Очистити чат",
         'chat_cleared': "✅ <b>Історія повідомлень видалена!</b>",
         'back': "🔙 Назад",
         'back_to_menu_btn': "🏠 В меню",
@@ -295,7 +291,7 @@ LOCALIZATION = {
         'error': '❌ Error. Type /start.',
         'cancel': "❌ Canceled. Type /start.",
         'restart': "🔄 Bot restarted!",
-        'unexpected_text': "⚠️ <b>Please use menu buttons.</b>",
+        'unexpected_text': "⚠️ <b>Please select a calculation using the buttons below:</b>",
         'settings_menu': "⚙️ <b>Settings:</b>",
         'change_language': "🌐 Change Language",
         'clear_chat_btn': "🗑 Clear Chat History",
@@ -308,18 +304,18 @@ LOCALIZATION = {
         'btn_hide_calc': "🙈 Hide Formula",
         'btn_miniapp': "📱 Open App",
 
-        'expl_header': "\n\n📝 <b>Details:</b>\n",
+        'expl_header': "\n\n📝 <b>Calculation Details:</b>\n",
         'expl_shelf': "<code>{price} - ({price} × {discount} / 100) = </code><b>{result:.2f}</b>",
-        'expl_nx': "1. Total: {n} + {x} = <b>{total_qty}</b>\n2. Pay for {n}: {price} × {n} = <b>{total_sum:.2f}</b>\n3. Unit price: {total_sum:.2f} / {total_qty} = <b>{unit_price:.2f}</b>",
-        'expl_weight': "<code>({price} / {weight}) × 1000 = </code><b>{kg_price:.2f}</b>",
-        'expl_original': "<code>{price} / (1 - {discount} / 100) = </code><b>{result:.2f}</b>",
-        'expl_margin': "• Profit: {shelf} - {cost} = <b>{profit:.2f}</b>\n• Markup: ({profit:.2f} / {cost}) × 100 = <b>{markup:.1f}%</b>\n• Margin: ({profit:.2f} / {shelf}) × 100 = <b>{margin:.1f}%</b>",
+        'expl_nx': "1. Total items: {n} + {x} = <b>{total_qty}</b>\n2. Pay only for {n}: {price} × {n} = {total_sum:.2f}\n3. Unit price: {total_sum:.2f} / {total_qty} = <b>{unit_price:.2f}</b>",
+        'expl_weight': "<code>({price} / {weight}) × 1000 = </code><b>{kg_price:.2f}</b> per kg",
+        'expl_original': "Discounted Price / (1 - Discount / 100)\n{price} / (1 - {discount} / 100) = <b>{result:.2f}</b>",
+        'expl_margin': "• Profit = Shelf - Cost\n  {shelf} - {cost} = {profit:.2f}\n\n• Markup = (Profit / Cost) × 100\n  ({profit:.2f} / {cost}) × 100 = <b>{markup:.1f}%</b>\n\n• Margin = (Profit / Shelf) × 100\n  ({profit:.2f} / {shelf}) × 100 = <b>{margin:.1f}%</b>",
 
         'mode_shelf': "🏷 <b>Discount Calculator</b>",
-        'mode_nx': "🎁 <b>N+X Promo</b>",
-        'mode_per_kg': "⚖️ <b>Price per kg/l</b>",
-        'mode_original_price': "🔙 <b>Reverse Price</b>",
-        'mode_margin': "📊 <b>Margin & Markup</b>",
+        'mode_nx': "🎁 <b>N+X Promo Calculator</b>",
+        'mode_per_kg': "⚖️ <b>Price per kg/l Calculator</b>",
+        'mode_original_price': "🔙 <b>Reverse Price Calculator</b>",
+        'mode_margin': "📊 <b>Margin & Markup Calculator</b>",
         
         'calc_title_shelf': "🏷 DISCOUNT PRICE",
         'calc_title_nx': "🎁 PROMO N+X",
@@ -367,7 +363,7 @@ async def send_clean_message(
     text: str,
     reply_markup=None,
     keep_result: bool = False,
-    parse_mode: str = 'HTML' # По умолчанию HTML
+    parse_mode: str = 'HTML'  # ВАЖНО: Включен HTML по умолчанию для красивого текста
 ):
     bot = context.bot
     if update.callback_query:
@@ -422,13 +418,12 @@ def get_language_keyboard():
 
 def get_main_menu_keyboard(context: ContextTypes.DEFAULT_TYPE):
     lang = get_language(context)
-    # 1. Сначала кнопка Mini App
+    # Кнопка Mini App
     keyboard = [[InlineKeyboardButton(
         text=LOCALIZATION[lang]['btn_miniapp'], 
         web_app=WebAppInfo(url=MINI_APP_URL)
     )]]
     
-    # 2. Потом остальные кнопки
     for text, data in LOCALIZATION[lang]['main_menu_btn']:
         keyboard.append([InlineKeyboardButton(text, callback_data=data)])
         
@@ -436,7 +431,6 @@ def get_main_menu_keyboard(context: ContextTypes.DEFAULT_TYPE):
 
 def get_next_actions_keyboard(context: ContextTypes.DEFAULT_TYPE):
     lang = get_language(context)
-    # В "Что дальше" Mini App не обязателен, но можно добавить. Пока оставим расчеты.
     keyboard = [
         [InlineKeyboardButton(text, callback_data=data)]
         for text, data in LOCALIZATION[lang]['main_menu_btn']
@@ -1132,9 +1126,13 @@ async def restart(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int:
 
 async def handle_unexpected_text(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int:
     lang = get_language(context)
-    # Мы убрали логику автоматического перехода в скидки.
-    # Теперь бот просто просит нажать кнопку.
-    await send_clean_message(update, context, LOCALIZATION[lang]["unexpected_text"])
+    # Теперь мы отправляем сообщение И КЛАВИАТУРУ
+    await send_clean_message(
+        update, 
+        context, 
+        LOCALIZATION[lang]["unexpected_text"], 
+        reply_markup=get_main_menu_keyboard(context) # <--- ВЕРНУЛИ КНОПКИ
+    )
     return ВЫБОР_ТИПА_СКИДКИ
 
 # ===== ЗАПУСК =====
@@ -1159,7 +1157,7 @@ def get_application():
                 CallbackQueryHandler(custom_discount, pattern="^(другая_скидка|інша_знижка)$"),
                 CallbackQueryHandler(settings_menu, pattern="^настройки$"),
                 
-                # Обработчики показать/скрыть расчет (глобальные для этого меню)
+                # ВОТ ЗДЕСЬ ДОБАВЛЕНА ПОДДЕРЖКА КНОПОК ПОКАЗАТЬ/СКРЫТЬ
                 CallbackQueryHandler(show_calculation_details, pattern="^show_calc$"),
                 CallbackQueryHandler(hide_calculation_details, pattern="^hide_calc$"),
                 
@@ -1217,7 +1215,7 @@ def get_application():
             CommandHandler("cancel", cancel), 
             CommandHandler("start", restart), 
             CallbackQueryHandler(restart, pattern="^перезапустить_бот$"),
-            # Глобальные обработчики
+            # Глобальные обработчики для безопасности
             CallbackQueryHandler(show_calculation_details, pattern="^show_calc$"),
             CallbackQueryHandler(hide_calculation_details, pattern="^hide_calc$")
         ],
