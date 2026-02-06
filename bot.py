@@ -1,6 +1,5 @@
 import os
 import logging
-import re
 import asyncio
 from telegram import (
     Update,
@@ -81,6 +80,7 @@ LOCALIZATION = {
         'next_action_prompt': "📊 Что считаем дальше?",
         'restart_btn': "🔄 Перезапустить бота",
         'btn_show_calc': "📝 Показать расчёт",
+        'btn_hide_calc': "🙈 Скрыть расчёт",
         
         # Шаблоны объяснений
         'expl_header': "\n\n📝 <b>Подробный расчёт:</b>\n",
@@ -121,7 +121,7 @@ LOCALIZATION = {
         'welcome': "👋 Ласкаво просимо! Оберіть мову:",
         'main_menu': "👋 Ласкаво просимо! Оберіть опцію:",
         'select_discount': "📦 Оберіть відсоток знижки:",
-        'enter_custom_discount': "🎯 Введіть відсоток знижки (наприклад, 15 або 14.5):",
+        'enter_custom_discount': "🎯 Введіть свій відсоток знижки (наприклад, 15 або 14.5):",
         'enter_price': "🔢 Введіть ціну на полиці (наприклад, 545.00):",
         'price_result': "{title}\n\n💰 Ціна на полиці: {price:.2f}\n⬇️ Знижка: {discount}%{extra}\n✅ РАЗОМ: {discounted_price:.2f}",
         'invalid_discount': "❌ Помилка. Знижка має бути від 0% до 100%.",
@@ -129,7 +129,7 @@ LOCALIZATION = {
         'enter_n': "🔢 Введіть кількість товарів до покупки (N):",
         'enter_x': "🎁 Введіть кількість товарів у подарунок (X):",
         'enter_nx_price': "💰 Введіть ціну одного товару:",
-        'nx_result': "{title}\n\n🛒 Акція: {n}+{x}\n💰 Ціна товару: {price:.2f}\n🏁 Всього за набір: {total:.2f}\n📉 Реальна знижка: {discount:.2f}%\n✅ Ціна за шт. в наборі: {unit_price:.2f}",
+        'nx_result': "{title}\n\n🛒 Акція: {n}+{x}\n💰 Ціна одного товару: {price:.2f}\n🏁 Всього за набір: {total:.2f}\n📉 Реальна знижка: {discount:.2f}%\n✅ Ціна за шт. в наборі: {unit_price:.2f}",
         'enter_weight_price': "💰 Введіть ціну упаковки:",
         'enter_weight': "⚖️ Введіть вагу/об'єм (грамів або мл):",
         'weight_result': '{title}\n\n📦 Упаковка: {weight:.2f} г/мл\n💰 Ціна: {price:.2f}\n\n✅ Ціна за 1 кг/л: {kg_price:.2f}\n📏 Ціна за 100 г/мл: {price_100g:.2f}',
@@ -149,6 +149,7 @@ LOCALIZATION = {
         'next_action_prompt': "📊 Що рахуємо далі?",
         'restart_btn': "🔄 Перезапустити бота",
         'btn_show_calc': "📝 Показати розрахунок",
+        'btn_hide_calc': "🙈 Приховати розрахунок",
 
         'expl_header': "\n\n📝 <b>Детальний розрахунок:</b>\n",
         'expl_shelf': "Ціна - (Ціна × Знижка / 100)\n{price} - ({price} × {discount} / 100) = <b>{result:.2f}</b>",
@@ -216,6 +217,7 @@ LOCALIZATION = {
         'next_action_prompt': "📊 What's next?",
         'restart_btn': "🔄 Restart Bot",
         'btn_show_calc': "📝 Show Calculation",
+        'btn_hide_calc': "🙈 Hide Calculation",
         
         'expl_header': "\n\n📝 <b>Calculation Details:</b>\n",
         'expl_shelf': "Price - (Price × Discount / 100)\n{price} - ({price} × {discount} / 100) = <b>{result:.2f}</b>",
@@ -391,6 +393,14 @@ def get_result_keyboard(context: ContextTypes.DEFAULT_TYPE):
     ]
     return InlineKeyboardMarkup(keyboard)
 
+def get_hide_result_keyboard(context: ContextTypes.DEFAULT_TYPE):
+    """Клавиатура с кнопкой СКРЫТЬ РАСЧЕТ"""
+    lang = get_language(context)
+    keyboard = [
+        [InlineKeyboardButton(LOCALIZATION[lang]['btn_hide_calc'], callback_data="hide_calc")]
+    ]
+    return InlineKeyboardMarkup(keyboard)
+
 def get_numeric_reply_keyboard():
     keyboard = [
         ["1", "2", "3"],
@@ -491,13 +501,8 @@ async def clear_chat_history(update: Update, context: ContextTypes.DEFAULT_TYPE)
         text=LOCALIZATION[lang]['chat_cleared']
     )
     
-    await send_clean_message(
-        update,
-        context,
-        LOCALIZATION[lang]['settings_menu'],
-        reply_markup=get_settings_keyboard(context)
-    )
-    return НАСТРОЙКИ
+    # Возвращаем пользователя в главное меню
+    return await start(update, context)
 
 # --- ОСНОВНЫЕ ФУНКЦИИ ---
 
@@ -950,12 +955,31 @@ async def show_calculation_details(update: Update, context: ContextTypes.DEFAULT
     current_text = query.message.text
     lang = get_language(context)
     
+    # Добавляем объяснение к тексту
     new_text = f"{current_text}{LOCALIZATION[lang]['expl_header']}{explanation}"
     
     try:
-        await query.edit_message_text(text=new_text, reply_markup=None, parse_mode='HTML')
+        # Меняем кнопку на "Скрыть"
+        await query.edit_message_text(text=new_text, reply_markup=get_hide_result_keyboard(context), parse_mode='HTML')
     except Exception as e:
         logger.error(f"Error editing message: {e}")
+
+async def hide_calculation_details(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
+    query = update.callback_query
+    await query.answer()
+    
+    current_text = query.message.text
+    lang = get_language(context)
+    header = LOCALIZATION[lang]['expl_header']
+
+    # Убираем объяснение (всё, что после заголовка)
+    if header in current_text:
+        original_text = current_text.split(header)[0]
+        try:
+            # Возвращаем исходный текст и кнопку "Показать"
+            await query.edit_message_text(text=original_text, reply_markup=get_result_keyboard(context), parse_mode='HTML')
+        except Exception as e:
+            logger.error(f"Error hiding details: {e}")
 
 # --- ОБЩИЕ ---
 
@@ -1044,7 +1068,11 @@ def get_application():
                 CallbackQueryHandler(handle_fixed_discount, pattern="^(5|10|15|20|25|30|35|40|45|50)$"),
                 CallbackQueryHandler(custom_discount, pattern="^(другая_скидка|інша_знижка)$"),
                 CallbackQueryHandler(settings_menu, pattern="^настройки$"),
+                
+                # Обработчики показать/скрыть расчет (глобальные для этого меню)
                 CallbackQueryHandler(show_calculation_details, pattern="^show_calc$"),
+                CallbackQueryHandler(hide_calculation_details, pattern="^hide_calc$"),
+                
                 CallbackQueryHandler(restart, pattern="^to_menu$"),
                 CallbackQueryHandler(restart, pattern="^перезапустить_бот$"),
                 CommandHandler("start", restart),
@@ -1078,7 +1106,9 @@ def get_application():
             CommandHandler("cancel", cancel), 
             CommandHandler("start", restart), 
             CallbackQueryHandler(restart, pattern="^перезапустить_бот$"),
-            CallbackQueryHandler(show_calculation_details, pattern="^show_calc$") 
+            # Глобальные обработчики
+            CallbackQueryHandler(show_calculation_details, pattern="^show_calc$"),
+            CallbackQueryHandler(hide_calculation_details, pattern="^hide_calc$")
         ],
         per_chat=True
     )
