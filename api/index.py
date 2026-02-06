@@ -1,5 +1,3 @@
-import os
-import asyncio
 from fastapi import FastAPI, Request
 from telegram import Update
 # Импортируем функцию создания бота из твоего файла bot.py
@@ -19,6 +17,16 @@ async def startup_event():
         # get_application() сама создает и возвращает готовое приложение
         ptb_app = get_application()
         await ptb_app.initialize()
+        await ptb_app.start()
+
+@app.on_event("shutdown")
+async def shutdown_event():
+    """Корректно останавливаем приложение PTB"""
+    global ptb_app
+    if ptb_app is not None:
+        await ptb_app.stop()
+        await ptb_app.shutdown()
+        ptb_app = None
 
 @app.post("/api/webhook")
 async def webhook(request: Request):
@@ -29,6 +37,7 @@ async def webhook(request: Request):
     if ptb_app is None:
         ptb_app = get_application()
         await ptb_app.initialize()
+        await ptb_app.start()
 
     # Получаем данные и обрабатываем
     data = await request.json()
