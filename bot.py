@@ -74,6 +74,7 @@ LOCALIZATION = {
         'settings_menu': "⚙️ Настройки:",
         'change_language': "🔄 Сменить язык",
         'back': "🔙 Назад",
+        'back_to_menu_btn': "🏠 В главное меню",
         'next_action_prompt': "📊 Что считаем дальше?",
         'restart_btn': "🔁 В главное меню",
         
@@ -90,7 +91,7 @@ LOCALIZATION = {
         
         'main_menu_btn': [
             ("🏷 Цена со скидкой", "menu_shelf_discount"),
-            ("🎁 Акция N+X", "menu_nx"),
+            ("🎁 Акція N+X", "menu_nx"),
             ("⚖️ Цена за кг/л", "menu_per_kg"),
             ("🔙 Цена без скидки", "menu_original_price"),
             ("📊 Маржа и Наценка", "menu_margin"),
@@ -130,6 +131,7 @@ LOCALIZATION = {
         'settings_menu': "⚙️ Налаштування:",
         'change_language': "🔄 Змінити мову",
         'back': "🔙 Назад",
+        'back_to_menu_btn': "🏠 В головне меню",
         'next_action_prompt': "📊 Що рахуємо далі?",
         'restart_btn': "🔁 В головне меню",
         
@@ -265,22 +267,19 @@ def get_discount_keyboard(context: ContextTypes.DEFAULT_TYPE):
         [InlineKeyboardButton(text, callback_data=data) for text, data in row]
         for row in LOCALIZATION[lang]['discount_buttons']
     ]
-    keyboard.append([InlineKeyboardButton(LOCALIZATION[lang]['back'], callback_data="назад")])
+    # На старте выбора скидки - кнопка В ГЛАВНОЕ МЕНЮ
+    keyboard.append([InlineKeyboardButton(LOCALIZATION[lang]['back_to_menu_btn'], callback_data="to_menu")])
     return InlineKeyboardMarkup(keyboard)
 
 def get_settings_keyboard(context: ContextTypes.DEFAULT_TYPE):
     lang = get_language(context)
     keyboard = [
         [InlineKeyboardButton(LOCALIZATION[lang]['change_language'], callback_data="сменить_язык")],
-        [InlineKeyboardButton(LOCALIZATION[lang]['back'], callback_data="назад")],
-        [InlineKeyboardButton(LOCALIZATION[lang]['restart_btn'], callback_data="перезапустить_бот")],
+        [InlineKeyboardButton(LOCALIZATION[lang]['back_to_menu_btn'], callback_data="to_menu")],
     ]
     return InlineKeyboardMarkup(keyboard)
 
 def get_numeric_reply_keyboard():
-    # Эта клавиатура используется для N и X.
-    # Так как мы добавляем Inline кнопку "Назад", текстовую клавиатуру можно оставить для удобства,
-    # или переделать полностью под инлайн. Оставим как есть, но добавим Inline кнопку "Назад" в сообщение.
     keyboard = [
         ["1", "2", "3"],
         ["4", "5", "6"],
@@ -290,16 +289,24 @@ def get_numeric_reply_keyboard():
     return ReplyKeyboardMarkup(keyboard, resize_keyboard=True, one_time_keyboard=True)
 
 def get_back_keyboard(context: ContextTypes.DEFAULT_TYPE):
+    """Клавиатура с кнопкой НАЗАД (на шаг назад)"""
     lang = get_language(context)
     keyboard = [
         [InlineKeyboardButton(LOCALIZATION[lang]['back'], callback_data="назад")]
     ]
     return InlineKeyboardMarkup(keyboard)
 
+def get_back_to_menu_keyboard(context: ContextTypes.DEFAULT_TYPE):
+    """Клавиатура с кнопкой В ГЛАВНОЕ МЕНЮ (для стартовых экранов)"""
+    lang = get_language(context)
+    keyboard = [
+        [InlineKeyboardButton(LOCALIZATION[lang]['back_to_menu_btn'], callback_data="to_menu")]
+    ]
+    return InlineKeyboardMarkup(keyboard)
+
 # ===== ОБРАБОТЧИКИ =====
 
 async def start(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int:
-    # Сброс режима при выходе в меню
     if 'mode_message_id' in context.user_data:
         await delete_mode_message(update, context)
 
@@ -373,7 +380,6 @@ async def change_language(update: Update, context: ContextTypes.DEFAULT_TYPE) ->
 async def calculate_shelf_discount(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int:
     lang = get_language(context)
     context.user_data['текущее_действие'] = 'menu_shelf_discount'
-    # Здесь предыдущее состояние - Главное меню (start)
     context.user_data['попередній_стан'] = ВЫБОР_ТИПА_СКИДКИ 
     
     if update.callback_query:
@@ -388,6 +394,7 @@ async def calculate_shelf_discount(update: Update, context: ContextTypes.DEFAULT
     )
     context.user_data['mode_message_id'] = mode_msg.message_id
 
+    # Здесь используется get_discount_keyboard, в которой мы уже заменили кнопку на "В меню"
     await send_clean_message(
         update,
         context,
@@ -401,13 +408,13 @@ async def handle_fixed_discount(update: Update, context: ContextTypes.DEFAULT_TY
     await update.callback_query.answer()
     discount = float(update.callback_query.data)
     context.user_data['скидка'] = discount
-    context.user_data['попередній_стан'] = ВЫБОР_ТИПА_СКИДКИ # Если нажмут назад - вернуть в выбор скидки
+    context.user_data['попередній_стан'] = ВЫБОР_ТИПА_СКИДКИ 
 
     await send_clean_message(
         update,
         context,
         LOCALIZATION[lang]['enter_price'],
-        reply_markup=get_back_keyboard(context) # Добавлена кнопка Назад
+        reply_markup=get_back_keyboard(context) # ШАГ 2: Кнопка НАЗАД
     )
     return ОЖИДАНИЕ_ЦЕНЫ
 
@@ -420,7 +427,7 @@ async def custom_discount(update: Update, context: ContextTypes.DEFAULT_TYPE) ->
         update,
         context,
         LOCALIZATION[lang]['enter_custom_discount'],
-        reply_markup=get_back_keyboard(context)
+        reply_markup=get_back_keyboard(context) # ШАГ 2 (ввод своей скидки): Кнопка НАЗАД
     )
     return ОЖИДАНИЕ_СВОЕЙ_СКИДКИ
 
@@ -438,13 +445,13 @@ async def handle_discount_input(update: Update, context: ContextTypes.DEFAULT_TY
             return ОЖИДАНИЕ_СВОЕЙ_СКИДКИ
 
         context.user_data['скидка'] = discount
-        context.user_data['попередній_стан'] = ОЖИДАНИЕ_СВОЕЙ_СКИДКИ # Если назад - то к вводу скидки
+        context.user_data['попередній_стан'] = ОЖИДАНИЕ_СВОЕЙ_СКИДКИ
 
         await send_clean_message(
             update,
             context,
             LOCALIZATION[lang]['enter_price'],
-            reply_markup=get_back_keyboard(context)
+            reply_markup=get_back_keyboard(context) # ШАГ 3: Кнопка НАЗАД
         )
         return ОЖИДАНИЕ_ЦЕНЫ
     except ValueError:
@@ -527,39 +534,28 @@ async def calculate_n_plus_x(update: Update, context: ContextTypes.DEFAULT_TYPE)
     )
     context.user_data['mode_message_id'] = mode_msg.message_id
 
-    # Здесь комбинируем Reply клавиатуру (цифры) и отправляем отдельное сообщение или текст с Inline (Назад)
-    # Но так как send_clean_message удаляет прошлое, лучше отправить Back инлайном под текстом.
-    # Reply клавиатура прикрепится к интерфейсу пользователя.
     await send_clean_message(
         update,
         context,
         LOCALIZATION[lang]['enter_n'],
-        reply_markup=get_back_keyboard(context) # Инлайн кнопка назад
+        # ШАГ 1: Кнопка В ГЛАВНОЕ МЕНЮ
+        reply_markup=get_back_to_menu_keyboard(context) 
     )
-    # Отправляем Reply клавиатуру отдельным методом, чтобы она появилась, или не отправляем вообще,
-    # так как пользователь просил "кнопку назад". 
-    # Если мы отправим ReplyKeyboardMarkup в send_clean_message, мы не сможем добавить Inline "Назад".
-    # Телеграм не разрешает смешивать Reply и Inline в одном сообщении.
-    # Решение: Отправить Inline "Назад", а цифры пусть вводит руками (или можно пожертвовать Reply кнопками).
-    # В коде выше была Reply клавиатура get_numeric_reply_keyboard(). 
-    # Чтобы работало и то и то, нужно два сообщения, но это засоряет чат.
-    # Оставим Inline Назад как приоритет.
-    
     return ОЖИДАНИЕ_N
 
 async def handle_n_input(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int:
     lang = get_language(context)
     text = update.message.text.strip()
     if not text.isdigit():
-        await send_clean_message(update, context, LOCALIZATION[lang]['invalid_number'], reply_markup=get_back_keyboard(context))
+        await send_clean_message(update, context, LOCALIZATION[lang]['invalid_number'], reply_markup=get_back_to_menu_keyboard(context))
         return ОЖИДАНИЕ_N
     n = int(text)
     if n <= 0:
-        await send_clean_message(update, context, LOCALIZATION[lang]['invalid_number'], reply_markup=get_back_keyboard(context))
+        await send_clean_message(update, context, LOCALIZATION[lang]['invalid_number'], reply_markup=get_back_to_menu_keyboard(context))
         return ОЖИДАНИЕ_N
     context.user_data['n'] = n
     context.user_data['попередній_стан'] = ОЖИДАНИЕ_N
-    await send_clean_message(update, context, LOCALIZATION[lang]['enter_x'], reply_markup=get_back_keyboard(context))
+    await send_clean_message(update, context, LOCALIZATION[lang]['enter_x'], reply_markup=get_back_keyboard(context)) # ШАГ 2: НАЗАД
     return ОЖИДАНИЕ_X
 
 async def handle_x_input(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int:
@@ -574,7 +570,7 @@ async def handle_x_input(update: Update, context: ContextTypes.DEFAULT_TYPE) -> 
         return ОЖИДАНИЕ_X
     context.user_data['x'] = x
     context.user_data['попередній_стан'] = ОЖИДАНИЕ_X
-    await send_clean_message(update, context, LOCALIZATION[lang]['enter_nx_price'], reply_markup=get_back_keyboard(context))
+    await send_clean_message(update, context, LOCALIZATION[lang]['enter_nx_price'], reply_markup=get_back_keyboard(context)) # ШАГ 3: НАЗАД
     return ОЖИДАНИЕ_ЦЕНЫ_NX
 
 async def handle_nx_price_input(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int:
@@ -621,7 +617,12 @@ async def calculate_price_per_kg(update: Update, context: ContextTypes.DEFAULT_T
         await update.callback_query.answer()
     mode_msg = await send_clean_message(update, context, LOCALIZATION[lang]['mode_per_kg'], reply_markup=None, keep_result=True)
     context.user_data['mode_message_id'] = mode_msg.message_id
-    await send_clean_message(update, context, LOCALIZATION[lang]['enter_weight_price'], reply_markup=get_back_keyboard(context))
+    await send_clean_message(
+        update, 
+        context, 
+        LOCALIZATION[lang]['enter_weight_price'], 
+        reply_markup=get_back_to_menu_keyboard(context) # ШАГ 1: В МЕНЮ
+    )
     return ОЖИДАНИЕ_ЦЕНЫ_ВЕС
 
 async def handle_weight_price_input(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int:
@@ -630,14 +631,14 @@ async def handle_weight_price_input(update: Update, context: ContextTypes.DEFAUL
     try:
         price = float(text)
         if price <= 0:
-            await send_clean_message(update, context, LOCALIZATION[lang]['invalid_price'], reply_markup=get_back_keyboard(context))
+            await send_clean_message(update, context, LOCALIZATION[lang]['invalid_price'], reply_markup=get_back_to_menu_keyboard(context))
             return ОЖИДАНИЕ_ЦЕНЫ_ВЕС
         context.user_data['цена_веса'] = price
         context.user_data['попередній_стан'] = ОЖИДАНИЕ_ЦЕНЫ_ВЕС
-        await send_clean_message(update, context, LOCALIZATION[lang]['enter_weight'], reply_markup=get_back_keyboard(context))
+        await send_clean_message(update, context, LOCALIZATION[lang]['enter_weight'], reply_markup=get_back_keyboard(context)) # ШАГ 2: НАЗАД
         return ОЖИДАНИЕ_ГРАММОВ
     except ValueError:
-        await send_clean_message(update, context, LOCALIZATION[lang]['invalid_price'], reply_markup=get_back_keyboard(context))
+        await send_clean_message(update, context, LOCALIZATION[lang]['invalid_price'], reply_markup=get_back_to_menu_keyboard(context))
         return ОЖИДАНИЕ_ЦЕНЫ_ВЕС
 
 async def handle_weight_input(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int:
@@ -678,7 +679,12 @@ async def calculate_original_price(update: Update, context: ContextTypes.DEFAULT
         await update.callback_query.answer()
     mode_msg = await send_clean_message(update, context, LOCALIZATION[lang]['mode_original_price'], reply_markup=None, keep_result=True)
     context.user_data['mode_message_id'] = mode_msg.message_id
-    await send_clean_message(update, context, LOCALIZATION[lang]['enter_price'], reply_markup=get_back_keyboard(context))
+    await send_clean_message(
+        update, 
+        context, 
+        LOCALIZATION[lang]['enter_price'], 
+        reply_markup=get_back_to_menu_keyboard(context) # ШАГ 1: В МЕНЮ
+    )
     return ОЖИДАНИЕ_ЦЕНЫ_СО_СКИДКОЙ
 
 async def handle_discounted_price(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int:
@@ -687,14 +693,14 @@ async def handle_discounted_price(update: Update, context: ContextTypes.DEFAULT_
     try:
         price = float(text)
         if price <= 0:
-            await send_clean_message(update, context, LOCALIZATION[lang]['invalid_price'], reply_markup=get_back_keyboard(context))
+            await send_clean_message(update, context, LOCALIZATION[lang]['invalid_price'], reply_markup=get_back_to_menu_keyboard(context))
             return ОЖИДАНИЕ_ЦЕНЫ_СО_СКИДКОЙ
         context.user_data['цена_со_скидкой'] = price
         context.user_data['попередній_стан'] = ОЖИДАНИЕ_ЦЕНЫ_СО_СКИДКОЙ
-        await send_clean_message(update, context, LOCALIZATION[lang]['enter_custom_discount'], reply_markup=get_back_keyboard(context))
+        await send_clean_message(update, context, LOCALIZATION[lang]['enter_custom_discount'], reply_markup=get_back_keyboard(context)) # ШАГ 2: НАЗАД
         return ОЖИДАНИЕ_ПРОЦЕНТА_СКИДКИ
     except ValueError:
-        await send_clean_message(update, context, LOCALIZATION[lang]['invalid_price'], reply_markup=get_back_keyboard(context))
+        await send_clean_message(update, context, LOCALIZATION[lang]['invalid_price'], reply_markup=get_back_to_menu_keyboard(context))
         return ОЖИДАНИЕ_ЦЕНЫ_СО_СКИДКОЙ
 
 async def calculate_original_price_result(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int:
@@ -720,7 +726,7 @@ async def calculate_original_price_result(update: Update, context: ContextTypes.
         await send_clean_message(update, context, LOCALIZATION[lang]['invalid_discount'], reply_markup=get_back_keyboard(context))
         return ОЖИДАНИЕ_ПРОЦЕНТА_СКИДКИ
 
-# --- МАРЖА И НАЦЕНКА (перенесено из PRO) ---
+# --- МАРЖА И НАЦЕНКА ---
 
 async def calculate_margin_start(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int:
     lang = get_language(context)
@@ -738,7 +744,12 @@ async def calculate_margin_start(update: Update, context: ContextTypes.DEFAULT_T
     )
     context.user_data['mode_message_id'] = mode_msg.message_id
     
-    await send_clean_message(update, context, LOCALIZATION[lang]['margin_enter_cost'], reply_markup=get_back_keyboard(context))
+    await send_clean_message(
+        update, 
+        context, 
+        LOCALIZATION[lang]['margin_enter_cost'], 
+        reply_markup=get_back_to_menu_keyboard(context) # ШАГ 1: В МЕНЮ
+    )
     return ОЖИДАНИЕ_ЗАКУПКИ
 
 async def handle_margin_cost_input(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int:
@@ -747,10 +758,10 @@ async def handle_margin_cost_input(update: Update, context: ContextTypes.DEFAULT
         val = float(update.message.text.replace(',', '.'))
         context.user_data['margin_cost'] = val
         context.user_data['попередній_стан'] = ОЖИДАНИЕ_ЗАКУПКИ
-        await send_clean_message(update, context, LOCALIZATION[lang]['margin_enter_shelf'], reply_markup=get_back_keyboard(context))
+        await send_clean_message(update, context, LOCALIZATION[lang]['margin_enter_shelf'], reply_markup=get_back_keyboard(context)) # ШАГ 2: НАЗАД
         return ОЖИДАНИЕ_ПОЛКИ_МАРЖА
     except ValueError:
-        await send_clean_message(update, context, LOCALIZATION[lang]['invalid_price'], reply_markup=get_back_keyboard(context))
+        await send_clean_message(update, context, LOCALIZATION[lang]['invalid_price'], reply_markup=get_back_to_menu_keyboard(context))
         return ОЖИДАНИЕ_ЗАКУПКИ
 
 async def handle_margin_shelf_input(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int:
@@ -780,37 +791,20 @@ async def back(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int:
     query = update.callback_query
     await query.answer()
 
-    # Определяем текущее состояние (откуда мы пришли)
-    # Так как back вызывается из разных состояний, нам нужно знать контекст
-    # Мы используем логику ручного возврата, так как ConversationHandler не хранит стек
-    
-    # 1. Если мы были в выборе цены (после выбора скидки)
-    # Текущее состояние определить сложно напрямую, поэтому смотрим на попередній_стан
-    # Но более надежно перенаправить в корень функции
-    
     current_action = context.user_data.get('текущее_действие')
     prev_state = context.user_data.get('попередній_стан')
 
     if current_action == 'menu_shelf_discount':
         if prev_state == ВЫБОР_ТИПА_СКИДКИ:
-             # Мы были в вводе своей скидки, возвращаемся в выбор
              return await calculate_shelf_discount(update, context)
-        # Если мы вводили цену, возвращаемся в выбор скидки
         return await calculate_shelf_discount(update, context)
 
     elif current_action == 'menu_nx':
-        # Логика для N+X
-        # Если мы были на вводе X (prev=ОЖИДАНИЕ_N), возвращаемся в начало (ввод N)
         if prev_state == ОЖИДАНИЕ_N:
              return await calculate_n_plus_x(update, context)
-        # Если мы были на вводе Цены (prev=ОЖИДАНИЕ_X), возвращаемся к вводу X
         if prev_state == ОЖИДАНИЕ_X:
-             # Чтобы вернуться к вводу X, нам нужно восстановить N
-             # Но проще перезапустить функцию N, так как юзер мог ошибиться в N
-             # Или вернемся к X:
              await send_clean_message(update, context, LOCALIZATION[get_language(context)]['enter_x'], reply_markup=get_back_keyboard(context))
              return ОЖИДАНИЕ_X
-        # Иначе в начало
         return await calculate_n_plus_x(update, context)
 
     elif current_action == 'menu_per_kg':
@@ -828,7 +822,6 @@ async def back(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int:
             return await calculate_margin_start(update, context)
         return await calculate_margin_start(update, context)
 
-    # По умолчанию в главное меню
     return await start(update, context)
 
 async def error_handler(update: object, context: ContextTypes.DEFAULT_TYPE | None) -> None:
@@ -866,9 +859,6 @@ def get_application():
     app = ApplicationBuilder().token(TOKEN).build()
     app.add_error_handler(error_handler)
     
-    # Общая обработка кнопки "назад" в состояниях, где ожидается текст
-    # Мы добавляем CallbackQueryHandler(back, pattern="^назад$") во все списки
-    
     conv_handler = ConversationHandler(
         entry_points=[CommandHandler("start", start)],
         states={
@@ -882,30 +872,38 @@ def get_application():
                 CallbackQueryHandler(handle_fixed_discount, pattern="^(5|10|15|20|25|30|35|40|45|50)$"),
                 CallbackQueryHandler(custom_discount, pattern="^(другая_скидка|інша_знижка)$"),
                 CallbackQueryHandler(settings_menu, pattern="^настройки$"),
+                
+                # ВОТ ЗДЕСЬ ВАЖНОЕ ИЗМЕНЕНИЕ: 
+                # Если нажали "to_menu" (В главное меню) - вызываем restart
+                CallbackQueryHandler(restart, pattern="^to_menu$"),
+                # Остальные кнопки работают как раньше
                 CallbackQueryHandler(restart, pattern="^перезапустить_бот$"),
-                # ВОТ ЗДЕСЬ БЫЛА ОШИБКА: Добавляем обработчик "Назад" для меню выбора скидки
-                CallbackQueryHandler(back, pattern="^назад$"),
                 CommandHandler("start", restart),
                 MessageHandler(filters.TEXT & ~filters.COMMAND, handle_unexpected_text),
             ],
+            
+            # В этих состояниях добавляем обработку и кнопки "НАЗАД", и кнопки "В МЕНЮ" (на всякий случай)
             ОЖИДАНИЕ_СВОЕЙ_СКИДКИ: [MessageHandler(filters.TEXT, handle_discount_input), CallbackQueryHandler(back, pattern="^назад$")],
             ОЖИДАНИЕ_ЦЕНЫ: [MessageHandler(filters.TEXT, handle_price_input), CallbackQueryHandler(back, pattern="^назад$")],
             
-            # Добавляем "Назад" во все состояния
-            ОЖИДАНИЕ_N: [MessageHandler(filters.TEXT, handle_n_input), CallbackQueryHandler(back, pattern="^назад$")],
+            # Для N+X: на первом шаге N будет кнопка "В меню", на остальных - "Назад"
+            ОЖИДАНИЕ_N: [MessageHandler(filters.TEXT, handle_n_input), CallbackQueryHandler(restart, pattern="^to_menu$")],
             ОЖИДАНИЕ_X: [MessageHandler(filters.TEXT, handle_x_input), CallbackQueryHandler(back, pattern="^назад$")],
             ОЖИДАНИЕ_ЦЕНЫ_NX: [MessageHandler(filters.TEXT, handle_nx_price_input), CallbackQueryHandler(back, pattern="^назад$")],
             
-            ОЖИДАНИЕ_ЦЕНЫ_ВЕС: [MessageHandler(filters.TEXT, handle_weight_price_input), CallbackQueryHandler(back, pattern="^назад$")],
+            # Для Цены веса
+            ОЖИДАНИЕ_ЦЕНЫ_ВЕС: [MessageHandler(filters.TEXT, handle_weight_price_input), CallbackQueryHandler(restart, pattern="^to_menu$")],
             ОЖИДАНИЕ_ГРАММОВ: [MessageHandler(filters.TEXT, handle_weight_input), CallbackQueryHandler(back, pattern="^назад$")],
             
-            ОЖИДАНИЕ_ЦЕНЫ_СО_СКИДКОЙ: [MessageHandler(filters.TEXT, handle_discounted_price), CallbackQueryHandler(back, pattern="^назад$")],
+            # Для обратного расчета
+            ОЖИДАНИЕ_ЦЕНЫ_СО_СКИДКОЙ: [MessageHandler(filters.TEXT, handle_discounted_price), CallbackQueryHandler(restart, pattern="^to_menu$")],
             ОЖИДАНИЕ_ПРОЦЕНТА_СКИДКИ: [MessageHandler(filters.TEXT, calculate_original_price_result), CallbackQueryHandler(back, pattern="^назад$")],
             
-            ОЖИДАНИЕ_ЗАКУПКИ: [MessageHandler(filters.TEXT, handle_margin_cost_input), CallbackQueryHandler(back, pattern="^назад$")],
+            # Для маржи
+            ОЖИДАНИЕ_ЗАКУПКИ: [MessageHandler(filters.TEXT, handle_margin_cost_input), CallbackQueryHandler(restart, pattern="^to_menu$")],
             ОЖИДАНИЕ_ПОЛКИ_МАРЖА: [MessageHandler(filters.TEXT, handle_margin_shelf_input), CallbackQueryHandler(back, pattern="^назад$")],
             
-            НАСТРОЙКИ: [CallbackQueryHandler(change_language, pattern="^сменить_язык$"), CallbackQueryHandler(back, pattern="^назад$")],
+            НАСТРОЙКИ: [CallbackQueryHandler(change_language, pattern="^сменить_язык$"), CallbackQueryHandler(restart, pattern="^to_menu$")],
         },
         fallbacks=[CommandHandler("cancel", cancel), CommandHandler("start", restart), CallbackQueryHandler(restart, pattern="^перезапустить_бот$")],
         per_chat=True
