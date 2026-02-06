@@ -54,16 +54,16 @@ LOCALIZATION = {
         'select_discount': "📦 Выберите процент скидки:",
         'enter_custom_discount': "🎯 Введите процент скидки (например, 15 или 14.5):",
         'enter_price': "🔢 Введите цену на полке (например, 545.00):",
-        'price_result': "{title}\n\n💰 Цена на полке: {price:.2f}\n⬇️ Скидка: {discount}%{extra}\n✅ ИТОГО: {discounted_price:.2f}",
+        'price_result': "{title}\n\n💰 Цена на полке: {price:.2f} грн\n⬇️ Скидка: {discount}%{extra}\n✅ ИТОГО: {discounted_price:.2f}",
         'invalid_discount': "❌ Ошибка. Скидка должна быть от 0% до 100%.",
         'invalid_price': "❌ Ошибка. Введите цену числом, например: 545.44.",
         'enter_n': "🔢 Введите количество товаров к покупке (N):",
         'enter_x': "🎁 Введите количество товаров в подарок (X):",
         'enter_nx_price': "💰 Введите цену одного товара:",
-        'nx_result': "{title}\n\n🛒 Акция: {n}+{x}\n💰 Цена товара: {price:.2f}\n🏁 Всего за набор: {total:.2f}\n📉 Реальная скидка: {discount:.2f}%\n✅ Цена за шт. в наборе: {unit_price:.2f}",
+        'nx_result': "{title}\n\n🛒 Акция: {n}+{x}\n💰 Цена товара: {price:.2f} грн\n🏁 Всего за набор: {total:.2f} грн\n📉 Реальная скидка: {discount:.2f}%\n✅ Цена за шт. в наборе: {unit_price:.2f}",
         'enter_weight_price': "💰 Введите цену упаковки:",
         'enter_weight': "⚖️ Введите вес/объем (грамм или мл):",
-        'weight_result': '{title}\n\n📦 Упаковка: {weight:.2f} г/мл\n💰 Цена: {price:.2f}\n\n✅ Цена за 1 кг/л: {kg_price:.2f}\n📏 Цена за 100 г/мл: {price_100g:.2f}',
+        'weight_result': '{title}\n\n📦 Упаковка: {weight:.2f} г/мл\n💰 Цена: {price:.2f} грн\n\n✅ Цена за 1 кг/л: {kg_price:.2f} грн\n📏 Цена за 100 г/мл: {price_100g:.2f}',
         'enter_price_short': 'Введите цену товара:',
         'enter_weight_short': 'Введите вес (г) или объем (мл):',
         'invalid_number': 'Пожалуйста, введите корректное число больше 0.',
@@ -123,7 +123,7 @@ LOCALIZATION = {
         'select_discount': "📦 Оберіть відсоток знижки:",
         'enter_custom_discount': "🎯 Введіть свій відсоток знижки (наприклад, 15 або 14.5):",
         'enter_price': "🔢 Введіть ціну на полиці (наприклад, 545.00):",
-        'price_result': "{title}\n\n💰 Ціна на полиці: {price:.2f}\n⬇️ Знижка: {discount}%{extra}\n✅ РАЗОМ: {discounted_price:.2f}",
+        'price_result': "{title}\n\n💰 Ціна на полиці: {price:.2f} грн\n⬇️ Знижка: {discount}%{extra}\n✅ РАЗОМ: {discounted_price:.2f}",
         'invalid_discount': "❌ Помилка. Знижка має бути від 0% до 100%.",
         'invalid_price': "❌ Помилка. Введіть ціну числом, наприклад: 545.44.",
         'enter_n': "🔢 Введіть кількість товарів до покупки (N):",
@@ -952,10 +952,11 @@ async def show_calculation_details(update: Update, context: ContextTypes.DEFAULT
     if not explanation:
         return
 
-    current_text = query.message.text
+    # Получаем HTML-текст (чтобы сохранить форматирование оригинала)
+    current_text = query.message.text_html
     lang = get_language(context)
     
-    # Добавляем объяснение к тексту
+    # Добавляем объяснение
     new_text = f"{current_text}{LOCALIZATION[lang]['expl_header']}{explanation}"
     
     try:
@@ -968,11 +969,12 @@ async def hide_calculation_details(update: Update, context: ContextTypes.DEFAULT
     query = update.callback_query
     await query.answer()
     
-    current_text = query.message.text
+    current_text = query.message.text_html
     lang = get_language(context)
+    # Нам нужен заголовок из локализации, но в HTML формате (с <b>)
     header = LOCALIZATION[lang]['expl_header']
 
-    # Убираем объяснение (всё, что после заголовка)
+    # Разделяем текст по заголовку
     if header in current_text:
         original_text = current_text.split(header)[0]
         try:
@@ -1069,7 +1071,7 @@ def get_application():
                 CallbackQueryHandler(custom_discount, pattern="^(другая_скидка|інша_знижка)$"),
                 CallbackQueryHandler(settings_menu, pattern="^настройки$"),
                 
-                # Обработчики показать/скрыть расчет (глобальные для этого меню)
+                # ВОТ ЗДЕСЬ ДОБАВЛЕНА ПОДДЕРЖКА КНОПОК ПОКАЗАТЬ/СКРЫТЬ
                 CallbackQueryHandler(show_calculation_details, pattern="^show_calc$"),
                 CallbackQueryHandler(hide_calculation_details, pattern="^hide_calc$"),
                 
@@ -1079,21 +1081,42 @@ def get_application():
                 MessageHandler(filters.TEXT & ~filters.COMMAND, handle_unexpected_text),
             ],
             
+            # ТАКЖЕ ДОБАВЛЕНА ПОДДЕРЖКА КНОПОК ВО ВСЕ ОСТАЛЬНЫЕ СОСТОЯНИЯ
             ОЖИДАНИЕ_СВОЕЙ_СКИДКИ: [MessageHandler(filters.TEXT, handle_discount_input), CallbackQueryHandler(back, pattern="^назад$")],
             ОЖИДАНИЕ_ЦЕНЫ: [MessageHandler(filters.TEXT, handle_price_input), CallbackQueryHandler(back, pattern="^назад$")],
             
             ОЖИДАНИЕ_N: [MessageHandler(filters.TEXT, handle_n_input), CallbackQueryHandler(restart, pattern="^to_menu$")],
             ОЖИДАНИЕ_X: [MessageHandler(filters.TEXT, handle_x_input), CallbackQueryHandler(back, pattern="^назад$")],
-            ОЖИДАНИЕ_ЦЕНЫ_NX: [MessageHandler(filters.TEXT, handle_nx_price_input), CallbackQueryHandler(back, pattern="^назад$")],
+            ОЖИДАНИЕ_ЦЕНЫ_NX: [
+                MessageHandler(filters.TEXT, handle_nx_price_input), 
+                CallbackQueryHandler(back, pattern="^назад$"),
+                CallbackQueryHandler(show_calculation_details, pattern="^show_calc$"),
+                CallbackQueryHandler(hide_calculation_details, pattern="^hide_calc$")
+            ],
             
             ОЖИДАНИЕ_ЦЕНЫ_ВЕС: [MessageHandler(filters.TEXT, handle_weight_price_input), CallbackQueryHandler(restart, pattern="^to_menu$")],
-            ОЖИДАНИЕ_ГРАММОВ: [MessageHandler(filters.TEXT, handle_weight_input), CallbackQueryHandler(back, pattern="^назад$")],
+            ОЖИДАНИЕ_ГРАММОВ: [
+                MessageHandler(filters.TEXT, handle_weight_input), 
+                CallbackQueryHandler(back, pattern="^назад$"),
+                CallbackQueryHandler(show_calculation_details, pattern="^show_calc$"),
+                CallbackQueryHandler(hide_calculation_details, pattern="^hide_calc$")
+            ],
             
             ОЖИДАНИЕ_ЦЕНЫ_СО_СКИДКОЙ: [MessageHandler(filters.TEXT, handle_discounted_price), CallbackQueryHandler(restart, pattern="^to_menu$")],
-            ОЖИДАНИЕ_ПРОЦЕНТА_СКИДКИ: [MessageHandler(filters.TEXT, calculate_original_price_result), CallbackQueryHandler(back, pattern="^назад$")],
+            ОЖИДАНИЕ_ПРОЦЕНТА_СКИДКИ: [
+                MessageHandler(filters.TEXT, calculate_original_price_result), 
+                CallbackQueryHandler(back, pattern="^назад$"),
+                CallbackQueryHandler(show_calculation_details, pattern="^show_calc$"),
+                CallbackQueryHandler(hide_calculation_details, pattern="^hide_calc$")
+            ],
             
             ОЖИДАНИЕ_ЗАКУПКИ: [MessageHandler(filters.TEXT, handle_margin_cost_input), CallbackQueryHandler(restart, pattern="^to_menu$")],
-            ОЖИДАНИЕ_ПОЛКИ_МАРЖА: [MessageHandler(filters.TEXT, handle_margin_shelf_input), CallbackQueryHandler(back, pattern="^назад$")],
+            ОЖИДАНИЕ_ПОЛКИ_МАРЖА: [
+                MessageHandler(filters.TEXT, handle_margin_shelf_input), 
+                CallbackQueryHandler(back, pattern="^назад$"),
+                CallbackQueryHandler(show_calculation_details, pattern="^show_calc$"),
+                CallbackQueryHandler(hide_calculation_details, pattern="^hide_calc$")
+            ],
             
             НАСТРОЙКИ: [
                 CallbackQueryHandler(change_language, pattern="^сменить_язык$"), 
@@ -1106,7 +1129,6 @@ def get_application():
             CommandHandler("cancel", cancel), 
             CommandHandler("start", restart), 
             CallbackQueryHandler(restart, pattern="^перезапустить_бот$"),
-            # Глобальные обработчики
             CallbackQueryHandler(show_calculation_details, pattern="^show_calc$"),
             CallbackQueryHandler(hide_calculation_details, pattern="^hide_calc$")
         ],
