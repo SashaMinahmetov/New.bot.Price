@@ -54,16 +54,16 @@ LOCALIZATION = {
         'select_discount': "📦 Выберите процент скидки:",
         'enter_custom_discount': "🎯 Введите процент скидки (например, 15 или 14.5):",
         'enter_price': "🔢 Введите цену на полке (например, 545.00):",
-        'price_result': "{title}\n\n💰 Цена на полке: {price:.2f} грн\n⬇️ Скидка: {discount}%{extra}\n✅ ИТОГО: {discounted_price:.2f} грн",
+        'price_result': "{title}\n\n💰 Цена на полке: {price:.2f}\n⬇️ Скидка: {discount}%{extra}\n✅ ИТОГО: {discounted_price:.2f}",
         'invalid_discount': "❌ Ошибка. Скидка должна быть от 0% до 100%.",
         'invalid_price': "❌ Ошибка. Введите цену числом, например: 545.44.",
         'enter_n': "🔢 Введите количество товаров к покупке (N):",
         'enter_x': "🎁 Введите количество товаров в подарок (X):",
         'enter_nx_price': "💰 Введите цену одного товара:",
-        'nx_result': "{title}\n\n🛒 Акция: {n}+{x}\n💰 Цена товара: {price:.2f} грн\n🏁 Всего за набор: {total:.2f} грн\n📉 Реальная скидка: {discount:.2f}%\n✅ Цена за шт. в наборе: {unit_price:.2f} грн",
+        'nx_result': "{title}\n\n🛒 Акция: {n}+{x}\n💰 Цена товара: {price:.2f}\n🏁 Всего за набор: {total:.2f}\n📉 Реальная скидка: {discount:.2f}%\n✅ Цена за шт. в наборе: {unit_price:.2f}",
         'enter_weight_price': "💰 Введите цену упаковки:",
         'enter_weight': "⚖️ Введите вес/объем (грамм или мл):",
-        'weight_result': '{title}\n\n📦 Упаковка: {weight:.2f} г/мл\n💰 Цена: {price:.2f} грн\n\n✅ Цена за 1 кг/л: {kg_price:.2f} грн\n📏 Цена за 100 г/мл: {price_100g:.2f} грн',
+        'weight_result': '{title}\n\n📦 Упаковка: {weight:.2f} г/мл\n💰 Цена: {price:.2f}\n\n✅ Цена за 1 кг/л: {kg_price:.2f}\n📏 Цена за 100 г/мл: {price_100g:.2f}',
         'enter_price_short': 'Введите цену товара:',
         'enter_weight_short': 'Введите вес (г) или объем (мл):',
         'invalid_number': 'Пожалуйста, введите корректное число больше 0.',
@@ -100,7 +100,7 @@ LOCALIZATION = {
         
         'main_menu_btn': [
             ("🏷 Цена со скидкой", "menu_shelf_discount"),
-            ("🎁 Акція N+X", "menu_nx"),
+            ("🎁 Акция N+X", "menu_nx"), # Исправлено: Акция (RU)
             ("⚖️ Цена за кг/л", "menu_per_kg"),
             ("🔙 Цена без скидки", "menu_original_price"),
             ("📊 Маржа и Наценка", "menu_margin"),
@@ -120,16 +120,16 @@ LOCALIZATION = {
         'select_discount': "📦 Оберіть відсоток знижки:",
         'enter_custom_discount': "🎯 Введіть відсоток знижки (наприклад, 15 або 14.5):",
         'enter_price': "🔢 Введіть ціну на полиці (наприклад, 545.00):",
-        'price_result': "{title}\n\n💰 Ціна на полиці: {price:.2f} грн\n⬇️ Знижка: {discount}%{extra}\n✅ РАЗОМ: {discounted_price:.2f} грн",
+        'price_result': "{title}\n\n💰 Ціна на полиці: {price:.2f}\n⬇️ Знижка: {discount}%{extra}\n✅ РАЗОМ: {discounted_price:.2f}",
         'invalid_discount': "❌ Помилка. Знижка має бути від 0% до 100%.",
         'invalid_price': "❌ Помилка. Введіть ціну числом, наприклад: 545.44.",
         'enter_n': "🔢 Введіть кількість товарів до покупки (N):",
         'enter_x': "🎁 Введіть кількість товарів у подарунок (X):",
         'enter_nx_price': "💰 Введіть ціну одного товару:",
-        'nx_result': "{title}\n\n🛒 Акція: {n}+{x}\n💰 Ціна товару: {price:.2f} грн\n🏁 Всього за набір: {total:.2f} грн\n📉 Реальна знижка: {discount:.2f}%\n✅ Ціна за шт. в наборі: {unit_price:.2f} грн",
+        'nx_result': "{title}\n\n🛒 Акція: {n}+{x}\n💰 Ціна товару: {price:.2f}\n🏁 Всього за набір: {total:.2f}\n📉 Реальна знижка: {discount:.2f}%\n✅ Ціна за шт. в наборі: {unit_price:.2f}",
         'enter_weight_price': "💰 Введіть ціну упаковки:",
         'enter_weight': "⚖️ Введіть вагу/об'єм (грамів або мл):",
-        'weight_result': '{title}\n\n📦 Упаковка: {weight:.2f} г/мл\n💰 Ціна: {price:.2f} грн\n\n✅ Ціна за 1 кг/л: {kg_price:.2f} грн\n📏 Ціна за 100 г/мл: {price_100g:.2f} грн',
+        'weight_result': '{title}\n\n📦 Упаковка: {weight:.2f} г/мл\n💰 Ціна: {price:.2f}\n\n✅ Ціна за 1 кг/л: {kg_price:.2f}\n📏 Ціна за 100 г/мл: {price_100g:.2f}',
         'enter_price_short': 'Введіть ціну товару:',
         'enter_weight_short': 'Введіть вагу (г) або об\'єм (мл):',
         'invalid_number': 'Будь ласка, введіть коректне число більше 0.',
@@ -179,6 +179,72 @@ LOCALIZATION = {
         ],
         'margin_enter_cost': "💼 Введіть закупівельну ціну:",
         'margin_enter_shelf': "🏷️ Введіть ціну на полиці:",
+    },
+    'en': {
+        'welcome': "👋 Welcome! Choose your language:",
+        'main_menu': "👋 Welcome! Choose an option:",
+        'select_discount': "📦 Select discount percentage:",
+        'enter_custom_discount': "🎯 Enter custom discount (e.g., 15 or 14.5):",
+        'enter_price': "🔢 Enter shelf price (e.g., 545.00):",
+        'price_result': "{title}\n\n💰 Shelf Price: {price:.2f}\n⬇️ Discount: {discount}%{extra}\n✅ TOTAL: {discounted_price:.2f}",
+        'invalid_discount': "❌ Error. Discount must be between 0% and 100%.",
+        'invalid_price': "❌ Error. Please enter a valid number, e.g., 545.44.",
+        'enter_n': "🔢 Enter quantity to buy (N):",
+        'enter_x': "🎁 Enter free quantity (X):",
+        'enter_nx_price': "💰 Enter price per item:",
+        'nx_result': "{title}\n\n🛒 Promo: {n}+{x}\n💰 Item Price: {price:.2f}\n🏁 Total Sum: {total:.2f}\n📉 Real Discount: {discount:.2f}%\n✅ Unit Price: {unit_price:.2f}",
+        'enter_weight_price': "💰 Enter pack price:",
+        'enter_weight': "⚖️ Enter weight/volume (grams or ml):",
+        'weight_result': '{title}\n\n📦 Pack: {weight:.2f} g/ml\n💰 Price: {price:.2f}\n\n✅ Price per 1 kg/l: {kg_price:.2f}\n📏 Price per 100 g/ml: {price_100g:.2f}',
+        'enter_price_short': 'Enter item price:',
+        'enter_weight_short': 'Enter weight (g) or volume (ml):',
+        'invalid_number': 'Please enter a valid number greater than 0.',
+        'error': '❌ Error. Type /start to restart.',
+        'cancel': "❌ Canceled. Type /start.",
+        'restart': "🔄 Bot restarted!",
+        'unexpected_text': "❌ Please use menu buttons.",
+        'settings_menu': "⚙️ Settings:",
+        'change_language': "🔄 Change Language",
+        'back': "🔙 Back",
+        'back_to_menu_btn': "🏠 Main Menu",
+        'next_action_prompt': "📊 What's next?",
+        'restart_btn': "🔁 Main Menu",
+        'btn_show_calc': "📝 Show Calculation",
+        
+        # Formula Explanations
+        'expl_header': "\n\n📝 <b>Calculation Details:</b>\n",
+        'expl_shelf': "Price - (Price × Discount / 100)\n{price} - ({price} × {discount} / 100) = <b>{result:.2f}</b>",
+        'expl_nx': "1. Total items: {n} + {x} = {total_qty}\n2. Pay only for {n}: {price} × {n} = {total_sum:.2f}\n3. Unit price: {total_sum:.2f} / {total_qty} = <b>{unit_price:.2f}</b>",
+        'expl_weight': "Price / Weight × 1000\n({price} / {weight}) × 1000 = <b>{kg_price:.2f}</b> per kg",
+        'expl_original': "Discounted Price / (1 - Discount / 100)\n{price} / (1 - {discount} / 100) = <b>{result:.2f}</b>",
+        'expl_margin': "• Profit = Shelf - Cost\n  {shelf} - {cost} = {profit:.2f}\n\n• Markup = (Profit / Cost) × 100\n  ({profit:.2f} / {cost}) × 100 = <b>{markup:.1f}%</b>\n\n• Margin = (Profit / Shelf) × 100\n  ({profit:.2f} / {shelf}) × 100 = <b>{margin:.1f}%</b>",
+
+        'mode_shelf': "🏷 Discount Calculator",
+        'mode_nx': "🎁 N+X Promo Calculator",
+        'mode_per_kg': "⚖️ Price per kg/l Calculator",
+        'mode_original_price': "🔙 Reverse Price Calculator",
+        'mode_margin': "📊 Margin & Markup Calculator",
+        
+        'calc_title_shelf': "🏷 Discount Price",
+        'calc_title_nx': "🎁 N+X Promo",
+        'calc_title_per_kg': "⚖️ Price per kg/l",
+        'calc_title_original_price': "🔙 Original Price",
+        
+        'main_menu_btn': [
+            ("🏷 Discount Price", "menu_shelf_discount"),
+            ("🎁 Promo N+X", "menu_nx"),
+            ("⚖️ Price per kg/l", "menu_per_kg"),
+            ("🔙 Original Price", "menu_original_price"),
+            ("📊 Margin & Markup", "menu_margin"),
+            ("⚙️ Settings", "настройки"),
+        ],
+        'discount_buttons': [
+            [("5%", "5"), ("10%", "10"), ("15%", "15"), ("20%", "20")],
+            [("25%", "25"), ("30%", "30"), ("35%", "35"), ("40%", "40")],
+            [("45%", "45"), ("50%", "50"), ("Other %", "другая_скидка")]
+        ],
+        'margin_enter_cost': "💼 Enter cost price:",
+        'margin_enter_shelf': "🏷️ Enter shelf price:",
     }
 }
 
@@ -253,8 +319,8 @@ async def delete_mode_message(update: Update, context: ContextTypes.DEFAULT_TYPE
 
 def get_language_keyboard():
     keyboard = [
-        [InlineKeyboardButton("Русский", callback_data="lang_ru")],
-        [InlineKeyboardButton("Українська", callback_data="lang_uk")]
+        [InlineKeyboardButton("Русский", callback_data="lang_ru"), InlineKeyboardButton("Українська", callback_data="lang_uk")],
+        [InlineKeyboardButton("English", callback_data="lang_en")]
     ]
     return InlineKeyboardMarkup(keyboard)
 
@@ -297,15 +363,6 @@ def get_settings_keyboard(context: ContextTypes.DEFAULT_TYPE):
     ]
     return InlineKeyboardMarkup(keyboard)
 
-def get_numeric_reply_keyboard():
-    keyboard = [
-        ["1", "2", "3"],
-        ["4", "5", "6"],
-        ["7", "8", "9"],
-        ["10"],
-    ]
-    return ReplyKeyboardMarkup(keyboard, resize_keyboard=True, one_time_keyboard=True)
-
 def get_back_keyboard(context: ContextTypes.DEFAULT_TYPE):
     lang = get_language(context)
     keyboard = [
@@ -339,7 +396,7 @@ async def start(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int:
         await send_clean_message(
             update,
             context,
-            "👋 Выберите язык / Оберіть мову:",
+            "👋 Выберите язык / Оберіть мову / Choose language:",
             reply_markup=get_language_keyboard()
         )
         return ВЫБОР_ЯЗЫКА
@@ -394,7 +451,7 @@ async def change_language(update: Update, context: ContextTypes.DEFAULT_TYPE) ->
     await send_clean_message(
         update,
         context,
-        "👋 Выберите язык / Оберіть мову:",
+        "👋 Выберите язык / Оберіть мову / Choose language:",
         reply_markup=get_language_keyboard()
     )
     return ВЫБОР_ЯЗЫКА
@@ -949,7 +1006,8 @@ def get_application():
     conv_handler = ConversationHandler(
         entry_points=[CommandHandler("start", start)],
         states={
-            ВЫБОР_ЯЗЫКА: [CallbackQueryHandler(choose_language, pattern="^lang_(ru|uk)$"), CommandHandler("start", start)],
+            # ОБНОВЛЕННЫЙ РЕГУЛЯРНОЕ ВЫРАЖЕНИЕ ДЛЯ ЯЗЫКОВ (ДОБАВЛЕН en)
+            ВЫБОР_ЯЗЫКА: [CallbackQueryHandler(choose_language, pattern="^lang_(ru|uk|en)$"), CommandHandler("start", start)],
             ВЫБОР_ТИПА_СКИДКИ: [
                 CallbackQueryHandler(calculate_shelf_discount, pattern="^menu_shelf_discount$"),
                 CallbackQueryHandler(calculate_n_plus_x, pattern="^menu_nx$"),
