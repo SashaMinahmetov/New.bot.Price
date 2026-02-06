@@ -8,6 +8,7 @@ from telegram import (
     InlineKeyboardMarkup,
     ReplyKeyboardMarkup,
     ReplyKeyboardRemove,
+    WebAppInfo,
 )
 from telegram.ext import (
     ApplicationBuilder,
@@ -21,6 +22,7 @@ from telegram.ext import (
 
 # Получаем токен
 TOKEN = os.getenv("TOKEN")
+MINI_APP_URL = os.getenv("MINI_APP_URL", "https://t.me/e_discount_bot/app")
 
 # Состояния диалога
 (
@@ -66,7 +68,9 @@ logger = logging.getLogger(__name__)
 LOCALIZATION = {
     'ru': {
         'welcome': "👋 Добро пожаловать! Выберите язык:",
-        'main_menu': "👋 Добро пожаловать! Выберите опцию для расчета:\n\n✨ Напоминание: у нас есть удобное mini app — можете открыть его из меню Telegram.",
+        'main_menu': "👋 Добро пожаловать! Выберите опцию для расчета:",
+        'mini_app_prompt': "✨ У нас есть удобное mini app — нажмите кнопку ниже, чтобы открыть.",
+        'mini_app_button': "🚀 Открыть mini app",
         'select_discount': "📦 Выберите процент скидки:",
         'enter_custom_discount': "🎯 Введите свой процент скидки (например, 14.44):",
         'enter_price': "🔢 Введите цену на полке (например, 545.44):",
@@ -153,7 +157,9 @@ LOCALIZATION = {
     },
     'uk': {
         'welcome': "👋 Ласкаво просимо! Оберіть мову:",
-        'main_menu': "👋 Ласкаво просимо! Оберіть опцію для розрахунку:\n\n✨ Нагадування: у нас є зручний mini app — мжете відкрити його з меню Telegram.",
+        'main_menu': "👋 Ласкаво просимо! Оберіть опцію для розрахунку:",
+        'mini_app_prompt': "✨ У нас є зручний mini app — натисніть кнопку нижче, щоб відкрити.",
+        'mini_app_button': "🚀 Відкрити mini app",
         'select_discount': "📦 Оберіть відсоток знижки:",
         'enter_custom_discount': "🎯 Введіть свій відсоток знижки (наприклад, 14.44):",
         'enter_price': "🔢 Введіть ціну на полиці (наприклад, 545.44):",
@@ -186,7 +192,7 @@ LOCALIZATION = {
         'calc_title_shelf': "📦 Скільки коштує зі знижкою",
         'calc_title_nx': "🎯 Знижка по акції N+X",
         'calc_title_per_kg': "⚖️ Скільки за кг/літр",
-        'calc_title_original_price': "💼 Дізнаись регулярну ціну без знижки",
+        'calc_title_original_price': "💼 Дізнатись регулярну ціну без знижки",
         'main_menu_btn': [
             ("📦 Скільки коштує зі знижкою", "menu_shelf_discount"),
             ("🎯 Знижка по акції N+X", "menu_nx"),
@@ -396,6 +402,29 @@ async def prompt_discount_percent(update: Update, context: ContextTypes.DEFAULT_
     return ОЖИДАНИЕ_ПРОЦЕНТА_СКИДКИ
 
 
+def get_mini_app_keyboard(context: ContextTypes.DEFAULT_TYPE):
+    if not MINI_APP_URL:
+        return None
+    lang = get_language(context)
+    return InlineKeyboardMarkup([
+        [InlineKeyboardButton(LOCALIZATION[lang]['mini_app_button'], web_app=WebAppInfo(url=MINI_APP_URL))]
+    ])
+
+
+async def send_mini_app_prompt(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
+    if not MINI_APP_URL:
+        return
+    chat = update.effective_chat
+    if not chat:
+        return
+    lang = get_language(context)
+    await context.bot.send_message(
+        chat_id=chat.id,
+        text=LOCALIZATION[lang]['mini_app_prompt'],
+        reply_markup=get_mini_app_keyboard(context),
+    )
+
+
 def get_pro_menu_keyboard(context: ContextTypes.DEFAULT_TYPE):
     lang = get_language(context)
     L = LOCALIZATION[lang]
@@ -439,6 +468,7 @@ async def start(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int:
         LOCALIZATION[lang]['main_menu'],
         reply_markup=keyboard
     )
+    await send_mini_app_prompt(update, context)
     return ВЫБОР_ТИПА_СКИДКИ
 
 
@@ -456,6 +486,7 @@ async def choose_language(update: Update, context: ContextTypes.DEFAULT_TYPE) ->
         LOCALIZATION[lang]['main_menu'],
         reply_markup=keyboard
     )
+    await send_mini_app_prompt(update, context)
     return ВЫБОР_ТИПА_СКИДКИ
 
 
@@ -744,7 +775,7 @@ async def handle_weight_price_input(update: Update, context: ContextTypes.DEFAUL
         context.user_data['цена_веса'] = price
         context.user_data['попередній_стан'] = ОЖИДАНИЕ_ЦЕНЫ_ВЕС
         await send_clean_message(update, context, LOCALIZATION[lang]['enter_weight'], reply_markup=None)
-        return ОЖИДАНИЕ_РАММОВ
+        return ОЖИДАНИЕ_ГРАММОВ
     except ValueError:
         await send_clean_message(update, context, LOCALIZATION[lang]['invalid_price'])
         return ОЖИДАНИЕ_ЦЕНЫ_ВЕС
