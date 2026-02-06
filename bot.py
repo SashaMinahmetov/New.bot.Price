@@ -743,8 +743,8 @@ async def handle_weight_price_input(update: Update, context: ContextTypes.DEFAUL
             return ОЖИДАНИЕ_ЦЕНЫ_ВЕС
         context.user_data['цена_веса'] = price
         context.user_data['попередній_стан'] = ОЖИДАНИЕ_ЦЕНЫ_ВЕС
-        await send_clean_message(update, context, LOCALIZATION[lang]['enter_weight'], reply_markup=None)
-        return ОЖИДАНИЕ_РАММОВ
+        await send_clean_message(update, context, LOCALIZATION[lang]['enter_weight'], reply_markup=None)␊
+        return ОЖИДАНИЕ_ГРАММОВ
     except ValueError:
         await send_clean_message(update, context, LOCALIZATION[lang]['invalid_price'])
         return ОЖИДАНИЕ_ЦЕНЫ_ВЕС
@@ -1230,3 +1230,4 @@ def get_application():
 
 # Функция-псевдоним, чтобы работать со старой версией api/index.py если вы ее не обновили
 register_handlers = get_application
+
