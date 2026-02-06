@@ -49,8 +49,13 @@ logger = logging.getLogger(__name__)
 # Словари с локализацией
 LOCALIZATION = {
     'ru': {
-        'welcome': "👋 Добро пожаловать! Выберите язык:",
+        'welcome': (
+            "🚀 <b>Вас приветствует Retail Calc!</b>\n\n"
+            "Я помогу быстро рассчитать скидки, маржу и сравнить цены.\n"
+            "Для начала работы выберите язык интерфейса:"
+        ),
         'main_menu': "👋 Добро пожаловать! Выберите опцию:",
+        'launch_app': "🚀 Запустить приложение",  # НОВОЕ
         'select_discount': "📦 Выберите процент скидки:",
         'enter_custom_discount': "🎯 Введите процент скидки (например, 15 или 14.5):",
         'enter_price': "🔢 Введите цену на полке (например, 545.00):",
@@ -70,7 +75,7 @@ LOCALIZATION = {
         'error': '❌ Ошибка. Введите /start для перезапуска.',
         'cancel': "❌ Отменено. Введите /start.",
         'restart': "🔄 Бот перезапущен!",
-        'unexpected_text': "⚠️ Пожалуйста, выберите вид расчёта кнопками ниже.", # Обновлено
+        'unexpected_text': "⚠️ Пожалуйста, выберите вид расчёта кнопками ниже.", 
         'settings_menu': "⚙️ Настройки:",
         'change_language': "🔄 Сменить язык",
         'clear_chat_btn': "🗑 Очистить чат",
@@ -118,8 +123,13 @@ LOCALIZATION = {
         'margin_enter_shelf': "🏷️ Введите цену на полке:",
     },
     'uk': {
-        'welcome': "👋 Ласкаво просимо! Оберіть мову:",
+        'welcome': (
+            "🚀 <b>Вас вітає Retail Calc!</b>\n\n"
+            "Я допоможу швидко розрахувати знижки, маржу та порівняти ціни.\n"
+            "Для початку роботи оберіть мову інтерфейсу:"
+        ),
         'main_menu': "👋 Ласкаво просимо! Оберіть опцію:",
+        'launch_app': "🚀 Запустити додаток", # НОВОЕ
         'select_discount': "📦 Оберіть відсоток знижки:",
         'enter_custom_discount': "🎯 Введіть свій відсоток знижки (наприклад, 15 або 14.5):",
         'enter_price': "🔢 Введіть ціну на полиці (наприклад, 545.00):",
@@ -139,7 +149,7 @@ LOCALIZATION = {
         'error': '❌ Помилка. Введіть /start для перезапуску.',
         'cancel': "❌ Скасовано. Введіть /start.",
         'restart': "🔄 Бот перезапущено!",
-        'unexpected_text': "⚠️ Будь ласка, оберіть вид розрахунку кнопками нижче.", # Обновлено
+        'unexpected_text': "⚠️ Будь ласка, оберіть вид розрахунку кнопками нижче.", 
         'settings_menu': "⚙️ Налаштування:",
         'change_language': "🔄 Змінити мову",
         'clear_chat_btn': "🗑 Очистити чат",
@@ -186,8 +196,13 @@ LOCALIZATION = {
         'margin_enter_shelf': "🏷️ Введіть ціну на полиці:",
     },
     'en': {
-        'welcome': "👋 Welcome! Choose your language:",
+        'welcome': (
+            "🚀 <b>Welcome to Retail Calc!</b>\n\n"
+            "I will help you calculate discounts, margins, and compare prices.\n"
+            "To get started, please choose your language:"
+        ),
         'main_menu': "👋 Welcome! Choose an option:",
+        'launch_app': "🚀 Launch App", # НОВОЕ
         'select_discount': "📦 Select discount percentage:",
         'enter_custom_discount': "🎯 Enter custom discount (e.g., 15 or 14.5):",
         'enter_price': "🔢 Enter shelf price (e.g., 545.00):",
@@ -207,7 +222,7 @@ LOCALIZATION = {
         'error': '❌ Error. Type /start to restart.',
         'cancel': "❌ Canceled. Type /start.",
         'restart': "🔄 Bot restarted!",
-        'unexpected_text': "⚠️ Please select a calculation using the buttons below.", # Обновлено
+        'unexpected_text': "⚠️ Please select a calculation using the buttons below.", 
         'settings_menu': "⚙️ Settings:",
         'change_language': "🔄 Change Language",
         'clear_chat_btn': "🗑 Clear Chat",
@@ -333,10 +348,21 @@ def get_language_keyboard():
 
 def get_main_menu_keyboard(context: ContextTypes.DEFAULT_TYPE):
     lang = get_language(context)
+    
+    # 1. Сначала берем стандартные кнопки
     keyboard = [
         [InlineKeyboardButton(text, callback_data=data)]
         for text, data in LOCALIZATION[lang]['main_menu_btn']
     ]
+    
+    # 2. Создаем кнопку приложения (URL)
+    app_btn_text = LOCALIZATION[lang].get('launch_app', "🚀 Launch App")
+    app_btn_url = "https://t.me/e_discount_bot/app"
+    app_btn = InlineKeyboardButton(text=app_btn_text, url=app_btn_url)
+    
+    # 3. Вставляем её в самое начало (первым рядом)
+    keyboard.insert(0, [app_btn])
+    
     return InlineKeyboardMarkup(keyboard)
 
 def get_next_actions_keyboard(context: ContextTypes.DEFAULT_TYPE):
@@ -418,11 +444,15 @@ async def start(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int:
 
     if 'language' not in context.user_data:
         context.user_data['попередній_стан'] = ВЫБОР_ЯЗЫКА
+        # Используем локализованное приветствие
+        welcome_text = LOCALIZATION['ru']['welcome'] 
+        
         await send_clean_message(
             update,
             context,
-            "👋 Выберите язык / Оберіть мову / Choose language:",
-            reply_markup=get_language_keyboard()
+            welcome_text,
+            reply_markup=get_language_keyboard(),
+            parse_mode='HTML' # Важно для жирного шрифта
         )
         return ВЫБОР_ЯЗЫКА
 
@@ -473,11 +503,16 @@ async def settings_menu(update: Update, context: ContextTypes.DEFAULT_TYPE) -> i
 async def change_language(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int:
     await update.callback_query.answer()
     context.user_data['попередній_стан'] = НАСТРОЙКИ
+    
+    # Используем локализованное приветствие
+    welcome_text = LOCALIZATION['ru']['welcome']
+    
     await send_clean_message(
         update,
         context,
-        "👋 Выберите язык / Оберіть мову / Choose language:",
-        reply_markup=get_language_keyboard()
+        welcome_text,
+        reply_markup=get_language_keyboard(),
+        parse_mode='HTML'
     )
     return ВЫБОР_ЯЗЫКА
 
@@ -1038,19 +1073,15 @@ async def restart(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int:
 
 async def handle_unexpected_text(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int:
     lang = get_language(context)
-    
-    # 1. Получаем клавиатуру главного меню (те же кнопки, что при старте)
+    # Исправлено: теперь клавиатура передается, чтобы пользователь не застрял
     keyboard = get_main_menu_keyboard(context)
     
-    # 2. Отправляем сообщение с предупреждением И прикрепляем кнопки
     await send_clean_message(
         update, 
         context, 
         LOCALIZATION[lang]["unexpected_text"], 
         reply_markup=keyboard 
     )
-    
-    # 3. Остаемся в состоянии выбора типа скидки
     return ВЫБОР_ТИПА_СКИДКИ
 
 # ===== ЗАПУСК =====
@@ -1075,7 +1106,7 @@ def get_application():
                 CallbackQueryHandler(custom_discount, pattern="^(другая_скидка|інша_знижка)$"),
                 CallbackQueryHandler(settings_menu, pattern="^настройки$"),
                 
-                # ВОТ ЗДЕСЬ ДОБАВЛЕНА ПОДДЕРЖКА КНОПОК ПОКАЗАТЬ/СКРЫТЬ
+                # Поддержка кнопок показать/скрыть
                 CallbackQueryHandler(show_calculation_details, pattern="^show_calc$"),
                 CallbackQueryHandler(hide_calculation_details, pattern="^hide_calc$"),
                 
@@ -1142,4 +1173,3 @@ def get_application():
     return app
 
 register_handlers = get_application
-
