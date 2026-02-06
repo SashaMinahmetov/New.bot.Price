@@ -70,7 +70,7 @@ LOCALIZATION = {
         'error': '❌ Ошибка. Введите /start для перезапуска.',
         'cancel': "❌ Отменено. Введите /start.",
         'restart': "🔄 Бот перезапущен!",
-        'unexpected_text': "❌ Используйте кнопки меню.",
+        'unexpected_text': "⚠️ Пожалуйста, выберите вид расчёта кнопками ниже.", # Обновлено
         'settings_menu': "⚙️ Настройки:",
         'change_language': "🔄 Сменить язык",
         'clear_chat_btn': "🗑 Очистить чат",
@@ -139,7 +139,7 @@ LOCALIZATION = {
         'error': '❌ Помилка. Введіть /start для перезапуску.',
         'cancel': "❌ Скасовано. Введіть /start.",
         'restart': "🔄 Бот перезапущено!",
-        'unexpected_text': "❌ Використовуйте кнопки меню.",
+        'unexpected_text': "⚠️ Будь ласка, оберіть вид розрахунку кнопками нижче.", # Обновлено
         'settings_menu': "⚙️ Налаштування:",
         'change_language': "🔄 Змінити мову",
         'clear_chat_btn': "🗑 Очистити чат",
@@ -207,7 +207,7 @@ LOCALIZATION = {
         'error': '❌ Error. Type /start to restart.',
         'cancel': "❌ Canceled. Type /start.",
         'restart': "🔄 Bot restarted!",
-        'unexpected_text': "❌ Please use menu buttons.",
+        'unexpected_text': "⚠️ Please select a calculation using the buttons below.", # Обновлено
         'settings_menu': "⚙️ Settings:",
         'change_language': "🔄 Change Language",
         'clear_chat_btn': "🗑 Clear Chat",
@@ -1038,14 +1038,8 @@ async def restart(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int:
 
 async def handle_unexpected_text(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int:
     lang = get_language(context)
-    if context.user_data.get("текущее_действие") == "menu_shelf_discount":
-        try:
-            val = float(update.message.text.replace(',', '.').replace('%', ''))
-            if 0 < val < 100:
-                context.user_data["скидка"] = val
-                await send_clean_message(update, context, LOCALIZATION[lang]["enter_price"], reply_markup=get_back_keyboard(context))
-                return ОЖИДАНИЕ_ЦЕНЫ
-        except: pass
+    # Мы убрали логику автоматического перехода в скидки.
+    # Теперь бот просто просит нажать кнопку.
     await send_clean_message(update, context, LOCALIZATION[lang]["unexpected_text"])
     return ВЫБОР_ТИПА_СКИДКИ
 
