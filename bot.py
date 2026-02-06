@@ -89,10 +89,12 @@ LOCALIZATION = {
         'unexpected_text': "❌ Используйте кнопки меню.",
         'settings_menu': "⚙️ Настройки:",
         'change_language': "🔄 Сменить язык",
+        'clear_chat_btn': "🗑 Очистить чат",
+        'chat_cleared': "✅ История сообщений бота очищена!",
         'back': "🔙 Назад",
         'back_to_menu_btn': "🏠 В главное меню",
         'next_action_prompt': "📊 Что считаем дальше?",
-        'restart_btn': "🔄 Перезапустить бота", # Изменено
+        'restart_btn': "🔄 Перезапустить бота",
         'btn_show_calc': "📝 Показать расчёт",
         
         # Шаблоны объяснений (Формулы)
@@ -116,7 +118,7 @@ LOCALIZATION = {
         
         'main_menu_btn': [
             ("🏷 Цена со скидкой", "menu_shelf_discount"),
-            ("🎁 Акция N+X", "menu_nx"), # Исправлено (было Акція)
+            ("🎁 Акция N+X", "menu_nx"), 
             ("⚖️ Цена за кг/л", "menu_per_kg"),
             ("🔙 Цена без скидки", "menu_original_price"),
             ("🌟 PRO режим", "menu_pro"),
@@ -169,7 +171,7 @@ LOCALIZATION = {
         'welcome': "👋 Ласкаво просимо! Оберіть мову:",
         'main_menu': "👋 Ласкаво просимо! Оберіть опцію:",
         'select_discount': "📦 Оберіть відсоток знижки:",
-        'enter_custom_discount': "🎯 Введіть відсоток знижки (наприклад, 15 або 14.5):",
+        'enter_custom_discount': "🎯 Введіть свій відсоток знижки (наприклад, 15 або 14.5):",
         'enter_price': "🔢 Введіть ціну на полиці (наприклад, 545.00):",
         'price_result': "{title}\n\n💰 Ціна на полиці: {price:.2f}\n⬇️ Знижка: {discount}%{extra}\n✅ РАЗОМ: {discounted_price:.2f}",
         'invalid_discount': "❌ Помилка. Знижка має бути від 0% до 100%.",
@@ -177,7 +179,7 @@ LOCALIZATION = {
         'enter_n': "🔢 Введіть кількість товарів до покупки (N):",
         'enter_x': "🎁 Введіть кількість товарів у подарунок (X):",
         'enter_nx_price': "💰 Введіть ціну одного товару:",
-        'nx_result': "{title}\n\n🛒 Акція: {n}+{x}\n💰 Ціна товару: {price:.2f}\n🏁 Всього за набір: {total:.2f}\n📉 Реальна знижка: {discount:.2f}%\n✅ Ціна за шт. в наборі: {unit_price:.2f}",
+        'nx_result': "{title}\n\n🛒 Акція: {n}+{x}\n💰 Ціна одного товару: {price:.2f}\n🏁 Всього за набір: {total:.2f}\n📉 Реальна знижка: {discount:.2f}%\n✅ Ціна за шт. в наборі: {unit_price:.2f}",
         'enter_weight_price': "💰 Введіть ціну упаковки:",
         'enter_weight': "⚖️ Введіть вагу/об'єм (грамів або мл):",
         'weight_result': '{title}\n\n📦 Упаковка: {weight:.2f} г/мл\n💰 Ціна: {price:.2f}\n\n✅ Ціна за 1 кг/л: {kg_price:.2f}\n📏 Ціна за 100 г/мл: {price_100g:.2f}',
@@ -190,10 +192,12 @@ LOCALIZATION = {
         'unexpected_text': "❌ Використовуйте кнопки меню.",
         'settings_menu': "⚙️ Налаштування:",
         'change_language': "🔄 Змінити мову",
+        'clear_chat_btn': "🗑 Очистити чат",
+        'chat_cleared': "✅ Історія повідомлень бота очищена!",
         'back': "🔙 Назад",
         'back_to_menu_btn': "🏠 В головне меню",
         'next_action_prompt': "📊 Що рахуємо далі?",
-        'restart_btn': "🔄 Перезапустити бота", # Изменено
+        'restart_btn': "🔄 Перезапустити бота",
         'btn_show_calc': "📝 Показати розрахунок",
 
         # Шаблоны объяснений (Формулы)
@@ -291,10 +295,12 @@ LOCALIZATION = {
         'unexpected_text': "❌ Please use menu buttons.",
         'settings_menu': "⚙️ Settings:",
         'change_language': "🔄 Change Language",
+        'clear_chat_btn': "🗑 Clear Chat",
+        'chat_cleared': "✅ Bot message history cleared!",
         'back': "🔙 Back",
         'back_to_menu_btn': "🏠 Main Menu",
         'next_action_prompt': "📊 What's next?",
-        'restart_btn': "🔄 Restart Bot", # Изменено
+        'restart_btn': "🔄 Restart Bot",
         'btn_show_calc': "📝 Show Calculation",
         
         # Formula Explanations
@@ -465,7 +471,6 @@ def get_next_actions_keyboard(context: ContextTypes.DEFAULT_TYPE):
         [InlineKeyboardButton(text, callback_data=data)]
         for text, data in LOCALIZATION[lang]['main_menu_btn']
     ]
-    # ЗДЕСЬ ИЗМЕНЕНИЕ: Кнопка теперь "Перезапустить бота"
     keyboard.append([
         InlineKeyboardButton(
             LOCALIZATION[lang]['restart_btn'],
@@ -489,6 +494,7 @@ def get_settings_keyboard(context: ContextTypes.DEFAULT_TYPE):
     lang = get_language(context)
     keyboard = [
         [InlineKeyboardButton(LOCALIZATION[lang]['change_language'], callback_data="сменить_язык")],
+        [InlineKeyboardButton(LOCALIZATION[lang]['clear_chat_btn'], callback_data="clear_chat")],
         [InlineKeyboardButton(LOCALIZATION[lang]['back_to_menu_btn'], callback_data="to_menu")],
     ]
     return InlineKeyboardMarkup(keyboard)
@@ -619,6 +625,41 @@ async def change_language(update: Update, context: ContextTypes.DEFAULT_TYPE) ->
         reply_markup=get_language_keyboard()
     )
     return ВЫБОР_ЯЗЫКА
+
+# --- НОВАЯ ФУНКЦИЯ ОЧИСТКИ ЧАТА ---
+async def clear_chat_history(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int:
+    await update.callback_query.answer()
+    
+    # Получаем список всех сообщений, которые бот отправлял
+    bot_messages = context.user_data.get("all_bot_messages", [])
+    chat_id = update.effective_chat.id
+    
+    # Удаляем сообщения
+    for msg_id in bot_messages:
+        try:
+            await context.bot.delete_message(chat_id=chat_id, message_id=msg_id)
+        except Exception:
+            # Игнорируем ошибки (если сообщение уже удалено или слишком старое)
+            pass
+            
+    # Очищаем список в памяти
+    context.user_data["all_bot_messages"] = []
+    
+    # Сообщаем об успехе и возвращаем меню настроек
+    lang = get_language(context)
+    await context.bot.send_message(
+        chat_id=chat_id, 
+        text=LOCALIZATION[lang]['chat_cleared']
+    )
+    
+    # Возвращаемся в меню настроек (отправляя новое сообщение)
+    await send_clean_message(
+        update,
+        context,
+        LOCALIZATION[lang]['settings_menu'],
+        reply_markup=get_settings_keyboard(context)
+    )
+    return НАСТРОЙКИ
 
 # --- ОСНОВНЫЕ ФУНКЦИИ ---
 
@@ -1380,7 +1421,13 @@ def get_application():
             ОЖИДАНИЕ_ЦЕНЫ_СО_СКИДКОЙ: [MessageHandler(filters.TEXT, handle_discounted_price), CallbackQueryHandler(back, pattern="^назад$")],
             ОЖИДАНИЕ_ПРОЦЕНТА_СКИДКИ: [MessageHandler(filters.TEXT, calculate_original_price_result), CallbackQueryHandler(back, pattern="^назад$")],
             
-            НАСТРОЙКИ: [CallbackQueryHandler(change_language, pattern="^сменить_язык$"), CallbackQueryHandler(back, pattern="^назад$")],
+            # В состояние НАСТРОЙКИ добавляем обработчик очистки чата
+            НАСТРОЙКИ: [
+                CallbackQueryHandler(change_language, pattern="^сменить_язык$"), 
+                CallbackQueryHandler(clear_chat_history, pattern="^clear_chat$"),
+                CallbackQueryHandler(back, pattern="^назад$"),
+                CallbackQueryHandler(restart, pattern="^to_menu$")
+            ],
             PRO_MENU: [
                 CallbackQueryHandler(pro_auto_start, pattern="^pro_auto$"),
                 CallbackQueryHandler(pro_fixed_start, pattern="^pro_fixed$"),
