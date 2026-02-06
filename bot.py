@@ -1038,9 +1038,19 @@ async def restart(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int:
 
 async def handle_unexpected_text(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int:
     lang = get_language(context)
-    # Мы убрали логику автоматического перехода в скидки.
-    # Теперь бот просто просит нажать кнопку.
-    await send_clean_message(update, context, LOCALIZATION[lang]["unexpected_text"])
+    
+    # 1. Получаем клавиатуру главного меню (те же кнопки, что при старте)
+    keyboard = get_main_menu_keyboard(context)
+    
+    # 2. Отправляем сообщение с предупреждением И прикрепляем кнопки
+    await send_clean_message(
+        update, 
+        context, 
+        LOCALIZATION[lang]["unexpected_text"], 
+        reply_markup=keyboard 
+    )
+    
+    # 3. Остаемся в состоянии выбора типа скидки
     return ВЫБОР_ТИПА_СКИДКИ
 
 # ===== ЗАПУСК =====
@@ -1132,3 +1142,4 @@ def get_application():
     return app
 
 register_handlers = get_application
+
