@@ -46,16 +46,20 @@ logging.basicConfig(
 )
 logger = logging.getLogger(__name__)
 
+# === НОВЫЙ ТЕКСТ ПРИВЕТСТВИЯ ===
+WELCOME_TEXT = (
+    "🚀 <b>Вітаю! Це SmartPrice</b>\n\n"
+    "Я допоможу швидко порахувати\n"
+    "реальну ціну, знижки та вигоду.\n\n"
+    "Оберіть мову інтерфейсу 👇"
+)
+
 # Словари с локализацией
 LOCALIZATION = {
     'ru': {
-        'welcome': (
-            "🚀 <b>Вас приветствует SmartPrice!</b>\n\n"
-            "Я помогу быстро рассчитать скидки, маржу и сравнить цены.\n"
-            "Для начала работы выберите язык интерфейса:"
-        ),
-        'main_menu': "👋 Добро пожаловать! Выберите опцию:",
-        'launch_app': "🚀 Запустить приложение",  # НОВОЕ
+        'welcome': WELCOME_TEXT, 
+        'main_menu': "👋 Добро пожаловать в SmartPrice! Выберите опцию:",
+        'launch_app': "🚀 Запустить приложение",
         'select_discount': "📦 Выберите процент скидки:",
         'enter_custom_discount': "🎯 Введите процент скидки (например, 15 или 14.5):",
         'enter_price': "🔢 Введите цену на полке (например, 545.00):",
@@ -87,7 +91,6 @@ LOCALIZATION = {
         'btn_show_calc': "📝 Показать расчёт",
         'btn_hide_calc': "🙈 Скрыть расчёт",
         
-        # Шаблоны объяснений
         'expl_header': "\n\n📝 <b>Подробный расчёт:</b>\n",
         'expl_shelf': "Цена - (Цена × Скидка / 100)\n{price} - ({price} × {discount} / 100) = <b>{result:.2f}</b>",
         'expl_nx': "1. Всего товаров: {n} + {x} = {total_qty}\n2. Платим только за {n}: {price} × {n} = {total_sum:.2f}\n3. Цена за шт: {total_sum:.2f} / {total_qty} = <b>{unit_price:.2f}</b>",
@@ -123,13 +126,9 @@ LOCALIZATION = {
         'margin_enter_shelf': "🏷️ Введите цену на полке:",
     },
     'uk': {
-        'welcome': (
-            "🚀 <b>Вас вітає SmartPrice!</b>\n\n"
-            "Я допоможу швидко розрахувати знижки, маржу та порівняти ціни.\n"
-            "Для початку роботи оберіть мову інтерфейсу:"
-        ),
-        'main_menu': "👋 Ласкаво просимо! Оберіть опцію:",
-        'launch_app': "🚀 Запустити додаток", # НОВОЕ
+        'welcome': WELCOME_TEXT, 
+        'main_menu': "👋 Ласкаво просимо до SmartPrice! Оберіть опцію:",
+        'launch_app': "🚀 Запустити додаток",
         'select_discount': "📦 Оберіть відсоток знижки:",
         'enter_custom_discount': "🎯 Введіть свій відсоток знижки (наприклад, 15 або 14.5):",
         'enter_price': "🔢 Введіть ціну на полиці (наприклад, 545.00):",
@@ -196,13 +195,9 @@ LOCALIZATION = {
         'margin_enter_shelf': "🏷️ Введіть ціну на полиці:",
     },
     'en': {
-        'welcome': (
-            "🚀 <b>Welcome to SmartPrice!</b>\n\n"
-            "I will help you calculate discounts, margins, and compare prices.\n"
-            "To get started, please choose your language:"
-        ),
-        'main_menu': "👋 Welcome! Choose an option:",
-        'launch_app': "🚀 Launch App", # НОВОЕ
+        'welcome': WELCOME_TEXT, 
+        'main_menu': "👋 Welcome to SmartPrice! Choose an option:",
+        'launch_app': "🚀 Launch App",
         'select_discount': "📦 Select discount percentage:",
         'enter_custom_discount': "🎯 Enter custom discount (e.g., 15 or 14.5):",
         'enter_price': "🔢 Enter shelf price (e.g., 545.00):",
@@ -444,13 +439,11 @@ async def start(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int:
 
     if 'language' not in context.user_data:
         context.user_data['попередній_стан'] = ВЫБОР_ЯЗЫКА
-        # Используем локализованное приветствие
-        welcome_text = LOCALIZATION['ru']['welcome'] 
         
         await send_clean_message(
             update,
             context,
-            welcome_text,
+            WELCOME_TEXT,
             reply_markup=get_language_keyboard(),
             parse_mode='HTML' # Важно для жирного шрифта
         )
@@ -504,13 +497,10 @@ async def change_language(update: Update, context: ContextTypes.DEFAULT_TYPE) ->
     await update.callback_query.answer()
     context.user_data['попередній_стан'] = НАСТРОЙКИ
     
-    # Используем локализованное приветствие
-    welcome_text = LOCALIZATION['ru']['welcome']
-    
     await send_clean_message(
         update,
         context,
-        welcome_text,
+        WELCOME_TEXT,
         reply_markup=get_language_keyboard(),
         parse_mode='HTML'
     )
@@ -1073,7 +1063,6 @@ async def restart(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int:
 
 async def handle_unexpected_text(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int:
     lang = get_language(context)
-    # Исправлено: теперь клавиатура передается, чтобы пользователь не застрял
     keyboard = get_main_menu_keyboard(context)
     
     await send_clean_message(
@@ -1093,7 +1082,11 @@ def get_application():
     app.add_error_handler(error_handler)
     
     conv_handler = ConversationHandler(
-        entry_points=[CommandHandler("start", start)],
+        entry_points=[
+            CommandHandler("start", start),
+            # ЭТА СТРОКА РЕШАЕТ ПРОБЛЕМУ "УМЕРШЕГО" МЕНЮ:
+            CallbackQueryHandler(restart)
+        ],
         states={
             ВЫБОР_ЯЗЫКА: [CallbackQueryHandler(choose_language, pattern="^lang_(ru|uk|en)$"), CommandHandler("start", start)],
             ВЫБОР_ТИПА_СКИДКИ: [
@@ -1106,7 +1099,6 @@ def get_application():
                 CallbackQueryHandler(custom_discount, pattern="^(другая_скидка|інша_знижка)$"),
                 CallbackQueryHandler(settings_menu, pattern="^настройки$"),
                 
-                # Поддержка кнопок показать/скрыть
                 CallbackQueryHandler(show_calculation_details, pattern="^show_calc$"),
                 CallbackQueryHandler(hide_calculation_details, pattern="^hide_calc$"),
                 
@@ -1116,7 +1108,6 @@ def get_application():
                 MessageHandler(filters.TEXT & ~filters.COMMAND, handle_unexpected_text),
             ],
             
-            # ТАКЖЕ ДОБАВЛЕНА ПОДДЕРЖКА КНОПОК ВО ВСЕ ОСТАЛЬНЫЕ СОСТОЯНИЯ
             ОЖИДАНИЕ_СВОЕЙ_СКИДКИ: [MessageHandler(filters.TEXT, handle_discount_input), CallbackQueryHandler(back, pattern="^назад$")],
             ОЖИДАНИЕ_ЦЕНЫ: [MessageHandler(filters.TEXT, handle_price_input), CallbackQueryHandler(back, pattern="^назад$")],
             
